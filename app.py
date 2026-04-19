@@ -379,14 +379,6 @@ with col2:
                     st.success("✅ Analyse complète !")
 
                     note = analysis.get("note", 0)
-                    xp_gain = min(note * 5, 100)
-
-                    update_xp(st.user.email, xp_gain)
-
-                    st.success(f"🎉 +{xp_gain} XP gagnés !")
-                    st.rerun()
-
-                    note = analysis.get("note", 0)
                     st.metric("⭐ Note", f"{note}/10")
                     st.metric("🔥 XP gagné", xp_gained)
 
@@ -448,6 +440,3 @@ with col2:
                         st.write(f"**💬 Coach:** {analysis.get('message_coach')}")
     else:
         st.info("Aucune analyse pour le moment. Upload un dessin pour commencer !")
-
-else:
-    st.warning("⚠️ Profil non chargé. Actualise la page.")
