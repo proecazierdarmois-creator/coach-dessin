@@ -6,8 +6,156 @@ from google import genai
 from google.genai import types
 from supabase import create_client, Client
 import os
+import uuid
 
-st.write("Gemini OK:", os.getenv("GEMINI_API_KEY") is not None)
+# ------------------------
+# SESSION STATE INIT
+# ------------------------
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+if "access_token" not in st.session_state:
+    st.session_state.access_token = None
+
+if "refresh_token" not in st.session_state:
+    st.session_state.refresh_token = None
+
+def update_profile(user_id, age, genre, niveau_dessin):
+    return supabase.table("profiles").upsert({
+        "id": user_id,
+        "age": age,
+        "genre": genre,
+        "niveau_dessin": niveau_dessin,
+    }).execute()
+
+    return result
+
+def get_level(xp):
+    if xp < 50:
+        return "Débutant 🟢"
+    elif xp < 150:
+        return "Intermédiaire 🔵"
+    else:
+        return "Avancé 🔴"
+
+def get_profile(user_id):
+    result = supabase.table("profiles").select("*").eq("id", user_id).execute()
+    
+    if result.data:
+        return result.data[0]
+    return None
+
+# ------------------------
+# CONFIG
+# ------------------------
+DEFAULT_AVATAR = "https://via.placeholder.com/150?text=Avatar"
+
+
+# ------------------------
+# UPLOAD AVATAR
+# ------------------------
+def upload_avatar(user_id, file_name, file_bytes, mime_type):
+    storage_path = f"{user_id}/{file_name}"
+
+    try:
+        supabase.storage.from_("avatars").upload(
+            storage_path,
+            file_bytes,
+            {"content-type": mime_type}
+        )
+    except Exception:
+        supabase.storage.from_("avatars").update(
+            storage_path,
+            file_bytes,
+            {"content-type": mime_type}
+        )
+
+    public_url = supabase.storage.from_("avatars").get_public_url(storage_path)
+    return public_url
+
+
+# ------------------------
+# UPDATE DB
+# ------------------------
+def update_avatar(user_id, avatar_url):
+    supabase.table("profiles").update({
+        "avatar_url": avatar_url
+    }).eq("id", user_id).execute()
+
+
+# ------------------------
+# GET AVATAR
+# ------------------------
+def get_avatar(profile):
+    if profile and profile.get("avatar_url"):
+        return profile.get("avatar_url")
+    return DEFAULT_AVATAR
+
+import uuid
+
+def upload_image(user_id, uploaded):
+    file_bytes = uploaded.getvalue()
+    mime_type = uploaded.type or "image/jpeg"
+
+    # 🔥 nom unique
+    unique_name = f"{uuid.uuid4()}_{uploaded.name}"
+    file_name = f"{user_id}/{unique_name}"
+
+    supabase.storage.from_("drawings").upload(
+        file_name,
+        file_bytes,
+        {"content-type": mime_type}
+    )
+
+    public_url = supabase.storage.from_("drawings").get_public_url(file_name)
+    return public_url
+
+def save_profile(user):
+    metadata = user.user_metadata or {}
+
+    supabase.table("profiles").upsert({
+        "id": user.id,
+        "email": user.email,
+        "age": metadata.get("age"),
+        "genre": metadata.get("genre"),
+        "niveau_dessin": metadata.get("niveau_dessin"),
+    }).execute()
+
+
+def get_profile(user_id):
+    result = supabase.table("profiles").select("*").eq("id", user_id).execute()
+    if result.data:
+        return result.data[0]
+    return None
+
+
+def update_xp(user_id, xp):
+    supabase.table("profiles").update({"xp": xp}).eq("id", user_id).execute()
+
+
+def save_analysis(user_id, theme, style, coach, note, defi, message_coach, image_url=None):
+    supabase.table("analyses").insert({
+        "user_id": user_id,
+        "theme": theme,
+        "style": style,
+        "coach": coach,
+        "note": note,
+        "defi": defi,
+        "message_coach": message_coach,
+        "image_url": image_url,
+    }).execute()
+
+
+def get_analyses(user_id):
+    result = (
+        supabase.table("analyses")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return result.data or []
 
 load_dotenv()
 
@@ -29,6 +177,53 @@ if not GEMINI_API_KEY:
     st.stop()
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+if "access_token" in st.session_state and "refresh_token" in st.session_state:
+    try:
+        session_response = supabase.auth.set_session(
+            st.session_state.access_token,
+            st.session_state.refresh_token
+        )
+
+        if "user" not in st.session_state or st.session_state.user is None:
+            st.session_state.user = session_response.user
+    except Exception:
+        st.session_state.user = None
+
+# 🔥 DOIT être au niveau 0 (aucun espace devant)
+query_params = st.query_params
+
+# Cas 1 : retour Google
+if "code" in query_params:
+    try:
+        auth_code = query_params["code"]
+
+        session = supabase.auth.exchange_code_for_session(auth_code)
+
+        st.session_state.user = session.user
+        st.session_state.access_token = session.session.access_token
+        st.session_state.refresh_token = session.session.refresh_token
+
+        save_profile(session.user)
+
+        st.query_params.clear()
+        st.rerun()
+
+    except Exception as e:
+        st.error("Erreur Google")
+        st.code(str(e))
+
+# Cas 2 : session déjà connue
+elif st.session_state.access_token and st.session_state.refresh_token:
+    try:
+        session = supabase.auth.set_session(
+            st.session_state.access_token,
+            st.session_state.refresh_token
+        )
+        st.session_state.user = session.user
+    except Exception:
+        st.session_state.user = None
+
 client = genai.Client()
 
 # ----------------------------
@@ -91,28 +286,27 @@ def analyse_dessin(image_bytes, mime_type, style, coach, theme):
     system_prompt = personnalites[coach]
 
     prompt = f"""
-{system_prompt}
+Tu es un professeur de dessin.
 
-Tu analyses le dessin d'un enfant de 11 ans.
+Tu analyses le dessin d'un utilisateur avec :
+- âge : {age}
+- niveau : {niveau_dessin}
 
-Style visé : {style}
-Sujet annoncé : {theme if theme else "non précisé"}
+Adapte ton langage :
+- enfant débutant → très simple, encourageant
+- niveau avancé → plus technique
 
-Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
+Style : {style}
+Sujet : {theme if theme else "non précisé"}
+
+Réponds en JSON :
 {{
-  "note": <nombre entier entre 1 et 10>,
-  "points_forts": ["point fort 1", "point fort 2"],
-  "ameliorations": ["amélioration 1", "amélioration 2"],
-  "defi": "un défi court, fun et concret",
-  "message_coach": "un petit message motivant du coach"
+  "note": 1 à 10,
+  "points_forts": ["...", "..."],
+  "ameliorations": ["...", "..."],
+  "defi": "...",
+  "message_coach": "..."
 }}
-
-Règles :
-- ton encourageant
-- adapté à un enfant de 11 ans
-- conseils concrets
-- phrases courtes
-- pas de critique dure
 """
 
     response = client.models.generate_content(
@@ -128,10 +322,17 @@ Règles :
 
     return json.loads(response.text)
 
-def sign_up(email: str, password: str):
+def sign_up(email: str, password: str, genre: str, age: int, niveau_dessin: str):
     return supabase.auth.sign_up({
         "email": email,
         "password": password,
+        "options": {
+            "data": {
+                "genre": genre,
+                "age": age,
+                "niveau_dessin": niveau_dessin,
+            }
+        }
     })
 
 def sign_in(email: str, password: str):
@@ -141,52 +342,178 @@ def sign_in(email: str, password: str):
     })
 
 def sign_out():
-    supabase.auth.sign_out()
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass
+
     st.session_state.user = None
+    st.session_state.access_token = None
+    st.session_state.refresh_token = None
 
 # ----------------------------
 # Auth UI
 # ----------------------------
+st.write("USER SESSION:", st.session_state.user)
+st.write("QUERY PARAMS:", st.query_params)
 if st.session_state.user is None:
     st.title("🎨 Coach de dessin IA")
     st.subheader("Connexion / Inscription")
 
-    mode = st.radio("Choisis une action", ["Connexion", "Inscription"], horizontal=True)
+    st.markdown("### 🔐 Connexion rapide")
 
-    with st.form("auth_form"):
+if st.button("🔵 Se connecter avec Google"):
+    response = supabase.auth.sign_in_with_oauth({
+        "provider": "google",
+        "options": {
+            "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
+        }
+    })
+    st.link_button("Continuer avec Google", response.url)
+
+st.divider()
+
+mode = st.radio("Choisis une action", ["Connexion", "Inscription"], horizontal=True)
+
+with st.form("auth_form"):
         email = st.text_input("Email")
         password = st.text_input("Mot de passe", type="password")
+
+        if mode == "Inscription":
+            genre = st.selectbox(
+                "Genre (optionnel)",
+                ["Je préfère ne pas dire", "Fille", "Garçon", "Non-binaire", "Autre"]
+            )
+            age = st.number_input("Âge", min_value=4, max_value=100, value=11, step=1)
+            niveau_dessin = st.selectbox(
+                "Niveau en dessin",
+                ["Débutant", "Intermédiaire", "Avancé"]
+            )
+
         submitted = st.form_submit_button("Valider")
 
-    if submitted:
+if submitted:
         try:
             if mode == "Inscription":
-                result = sign_up(email, password)
-                st.success("Compte créé. Vérifie ton email si une confirmation est demandée.")
-                # Certains projets connectent immédiatement, d'autres demandent confirmation email
+                result = sign_up(email, password, genre, int(age), niveau_dessin)
+                st.success("Compte créé.")
                 user = getattr(result, "user", None)
                 session = getattr(result, "session", None)
                 if session and user:
                     st.session_state.user = user
+                    st.session_state.access_token = session.access_token
+                    st.session_state.refresh_token = session.refresh_token
+
+                    save_profile(user)
+
                     st.rerun()
+
             else:
                 result = sign_in(email, password)
                 if result and result.user:
                     st.session_state.user = result.user
+                    st.session_state.access_token = result.session.access_token
+                    st.session_state.refresh_token = result.session.refresh_token
+
+                    profile = get_profile(result.user.id)
+                    if profile:
+                        st.session_state.xp = profile.get("xp", 0)
+
+                    save_profile(result.user)
+
+                    st.success("Connexion réussie.")
+                    st.rerun()
+                if result and result.user:
+                    st.session_state.user = result.user
+                    st.session_state.access_token = result.session.access_token
+                    st.session_state.refresh_token = result.session.refresh_token
+
+                    save_profile(result.user)
+
                     st.success("Connexion réussie.")
                     st.rerun()
                 else:
                     st.error("Connexion impossible.")
+
         except Exception as e:
             st.error("Erreur d'authentification")
             st.code(str(e))
 
-    st.stop()
+st.stop()
 
 # ----------------------------
 # App protégée
 # ----------------------------
 user = st.session_state.user
+profile = get_profile(user.id)
+st.write("USER ID:", user.id)
+
+st.write("PROFILE ID:", profile.get("id") if profile else None)
+xp = profile.get("xp", 0) if profile else 0
+niveau_label = get_level(xp)
+
+if profile:
+    avatar_url = profile.get("avatar_url")
+else:
+    avatar_url = None
+
+    st.divider()
+st.subheader("👤 Mon profil")
+
+current_age = profile.get("age") if profile else 11
+if current_age is None:
+    current_age = 11
+
+current_genre = profile.get("genre", "Je préfère ne pas dire") if profile else "Je préfère ne pas dire"
+current_niveau = profile.get("niveau_dessin", "Débutant") if profile else "Débutant"
+
+with st.form("profile_form"):
+    new_age = st.number_input("Âge", min_value=4, max_value=100, value=int(current_age), step=1)
+
+    genres = ["Je préfère ne pas dire", "Fille", "Garçon", "Non-binaire", "Autre"]
+    genre_index = genres.index(current_genre) if current_genre in genres else 0
+    new_genre = st.selectbox("Genre", genres, index=genre_index)
+
+    niveaux = ["Débutant", "Intermédiaire", "Avancé"]
+    niveau_index = niveaux.index(current_niveau) if current_niveau in niveaux else 0
+    new_niveau = st.selectbox("Niveau en dessin", niveaux, index=niveau_index)
+
+    save_profile_button = st.form_submit_button("Enregistrer mon profil")
+
+if save_profile_button:
+    try:
+        result = update_profile(user.id, int(new_age), new_genre, new_niveau)
+        st.write(result)
+        st.success("Profil mis à jour")
+        st.rerun()
+    except Exception as e:
+        st.error("Erreur lors de la mise à jour du profil")
+        st.code(str(e))
+
+metadata = user.user_metadata or {}
+
+age = metadata.get("age", 11)
+niveau_dessin = metadata.get("niveau_dessin", "Débutant")
+
+profile = get_profile(user.id)
+
+genre = profile.get("genre", "Non renseigné") if profile else "Non renseigné"
+age = profile.get("age", "Non renseigné") if profile else "Non renseigné"
+niveau_dessin = profile.get("niveau_dessin", "Non renseigné") if profile else "Non renseigné"
+
+avatar_url = get_avatar(profile)
+
+col1, col2 = st.columns([1, 3])
+
+with col1:
+    st.image(avatar_url, width=100)
+
+with col2:
+    st.markdown(f"### 👤 {user.email}")
+    st.write(f"🎯 XP : **{xp}**")
+    st.write(f"🏆 Niveau : **{niveau_label}**")
+st.write(f"Genre : **{genre}**")
+st.write(f"Âge : **{age}**")
 
 st.title("🎨 Coach de dessin IA")
 st.write(f"Connecté : **{user.email}**")
@@ -223,7 +550,8 @@ else:
 
 if uploaded:
     st.image(uploaded, caption="Ton dessin", use_container_width=True)
-
+    image_url = upload_image(user.id, uploaded)
+    
     if st.button("Analyser mon dessin"):
         image_bytes = uploaded.read()
         mime_type = uploaded.type or "image/jpeg"
@@ -277,10 +605,13 @@ if uploaded:
 st.divider()
 st.subheader("📚 Historique")
 
-if st.session_state.historique:
-    for item in st.session_state.historique:
-        st.write(
-            f"• {item['theme']} — style : {item['style']} — coach : {item['coach']} — note : {item['note']}/10"
-        )
+historique = get_analyses(user.id)
+
+if historique:
+    for item in historique:
+        st.write(f"🎯 {item['theme']} — Note : {item['note']}/10")
+
+        if item.get("image_url"):
+            st.image(item["image_url"], width=200)
 else:
-    st.write("Pas encore d’analyse.")
+    st.write("Pas encore de dessins.")
