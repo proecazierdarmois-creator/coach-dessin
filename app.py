@@ -190,15 +190,15 @@ if "access_token" in st.session_state and "refresh_token" in st.session_state:
     except Exception:
         st.session_state.user = None
 
-# 🔥 DOIT être au niveau 0 (aucun espace devant)
 query_params = st.query_params
 
-# Cas 1 : retour Google
 if "code" in query_params:
     try:
         auth_code = query_params["code"]
 
-        session = supabase.auth.exchange_code_for_session(auth_code)
+        session = supabase.auth.exchange_code_for_session({
+            "auth_code": auth_code
+        })
 
         st.session_state.user = session.user
         st.session_state.access_token = session.session.access_token
