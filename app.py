@@ -332,6 +332,14 @@ if profile:
                     st.success("✅ Analyse complète !")
 
                     note = analysis.get("note", 0)
+                    xp_gain = min(note * 5, 100)
+
+                    update_xp(st.user.email, xp_gain)
+
+                    st.success(f"🎉 +{xp_gain} XP gagnés !")
+                    st.rerun()
+
+                    note = analysis.get("note", 0)
                     st.metric("⭐ Note", f"{note}/10")
                     st.metric("🔥 XP gagné", xp_gained)
 
