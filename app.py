@@ -201,7 +201,7 @@ if profile:
 
     st.write("")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         st.metric("📊 XP", profile.get("xp", 0))
@@ -229,10 +229,6 @@ if profile:
     with col3:
         age = profile.get("age")
         st.metric("🎂 Âge", age if age else "—")
-
-    with col4:
-        niveau = profile.get("niveau_dessin")
-        st.metric("📚 Niveau", niveau if niveau else "—")
 
     st.write("")
     st.write("---")
