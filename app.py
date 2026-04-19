@@ -95,8 +95,13 @@ def save_analysis(profile_id, image_url, analysis):
 
 
 def get_analyses(profile_id):
-    """Récupère l'historique des analyses"""
-    result = supabase.table("analyses").select("*").eq("profile_id", profile_id).order("created_at", desc=True).execute()
+    result = (
+        supabase.table("analyses")
+        .select("*")
+        .eq("profile_id", profile_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
     return result.data or []
 
 
@@ -209,10 +214,8 @@ if profile:
     st.write("")
     st.write("---")
     st.write("🚀 Prêt à démarrer ? Sélectionne une option ci-dessous")
-else:
-    st.warning("Profil non chargé.")
 
-    # ----------------------------
+# ----------------------------
 # MON PROFIL
 # ----------------------------
 with st.expander("⚙️ Mon profil", expanded=False):
@@ -264,7 +267,8 @@ with st.expander("⚙️ Mon profil", expanded=False):
             st.rerun()
         else:
             st.error("❌ Erreur lors de la mise à jour")
-            st.write("")
+
+st.write("")
 st.subheader("📸 Analyser ton dessin")
 
 uploaded_file = st.file_uploader(
@@ -278,17 +282,39 @@ if uploaded_file is not None:
     if st.button("🚀 Lancer l'analyse"):
         with st.spinner("🤖 Analyse en cours..."):
             try:
+                # Upload l'image
+                import uuid
+                file_bytes = uploaded_file.getvalue()
+                file_ext = uploaded_file.name.split(".")[-1]
+                file_name = f"drawings/{profile.get('id')}/{uuid.uuid4()}.{file_ext}"
+                
+                supabase.storage.from_("drawings").upload(
+                    file_name,
+                    file_bytes,
+                    {"content-type": uploaded_file.type}
+                )
+                image_url = supabase.storage.from_("drawings").get_public_url(file_name)
+                
+                # Analyse avec Gemini
                 analysis = analyze_drawing(
-                    uploaded_file.getvalue(),
+                    file_bytes,
                     uploaded_file.type,
                     profile.get("age") or 10,
                     profile.get("niveau_dessin") or "Débutant"
                 )
 
+                # Sauvegarde l'analyse
+                save_analysis(profile.get("id"), image_url, analysis)
+                
+                # Met à jour l'XP
+                xp_gained = min(analysis.get("note", 0) * 5, 100)
+                update_xp(profile.get("id"), xp_gained)
+
                 st.success("✅ Analyse complète !")
 
                 note = analysis.get("note", 0)
                 st.metric("⭐ Note", f"{note}/10")
+                st.metric("🔥 XP gagné", xp_gained)
 
                 col1, col2 = st.columns(2)
 
@@ -309,17 +335,7 @@ if uploaded_file is not None:
                 st.success(analysis.get("message_coach", ""))
 
             except Exception as e:
-                st.error("❌ L'analyse a échoué. Réessaie avec une autre image ou relance.")
-                st.code(str(e))
-                supabase.table("analyses").insert({
-    "email": st.user.email,
-    "image_url": "temp",  # on verra l’upload juste après
-    "note": analysis.get("note"),
-    "points_forts": analysis.get("points_forts"),
-    "ameliorations": analysis.get("ameliorations"),
-    "defi": analysis.get("defi"),
-    "message_coach": analysis.get("message_coach"),
-}).execute()
+                st.error(f"❌ Erreur : {str(e)}")
 
 # ----------------------------
 # HISTORIQUE DES ANALYSES
