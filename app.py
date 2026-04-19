@@ -6,6 +6,100 @@ from google.genai import types
 
 st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
 
+st.markdown("""
+<style>
+.badge-card {
+    padding: 12px;
+    border-radius: 12px;
+    margin: 5px;
+    background-color: #f5f5f5;
+    border: 1px solid #e5e5e5;
+    text-align: center;
+}
+
+.badge-locked {
+    opacity: 0.4;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+h1, h2, h3 {
+    font-family: sans-serif;
+}
+
+[data-testid="stMetric"] {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+[data-testid="stMetric"] {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+div[data-testid="stVerticalBlock"] div:has(> div[data-testid="stImage"]) {
+    border-radius: 12px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+def get_daily_challenge(level):
+    if level < 2:
+        return "Dessine un objet simple avec une ombre."
+    elif level < 5:
+        return "Dessine un personnage avec 3 expressions différentes."
+    elif level < 10:
+        return "Dessine une scène avec profondeur et arrière-plan."
+    else:
+        return "Crée une composition complète avec lumière, perspective et détails."
+    
+def get_all_badges():
+    return [
+        {"name": "🌟 Premier élan", "rule": "Atteindre 50 XP"},
+        {"name": "🔥 En progression", "rule": "Atteindre 200 XP"},
+        {"name": "🎨 Artiste régulier", "rule": "Atteindre 500 XP"},
+        {"name": "🖼️ 5 dessins analysés", "rule": "Faire 5 analyses"},
+        {"name": "🏅 10 dessins analysés", "rule": "Faire 10 analyses"},
+        {"name": "👑 Maître du croquis", "rule": "Atteindre 1000 XP"},
+    ]
+
+
+def get_badges(xp, analyses_count):
+    badges = []
+
+    if xp >= 50:
+        badges.append("🌟 Premier élan")
+    if xp >= 200:
+        badges.append("🔥 En progression")
+    if xp >= 500:
+        badges.append("🎨 Artiste régulier")
+    if analyses_count >= 5:
+        badges.append("🖼️ 5 dessins analysés")
+    if analyses_count >= 10:
+        badges.append("🏅 10 dessins analysés")
+    if xp >= 1000:
+        badges.append("👑 Maître du croquis")
+
+    return badges
+
 # ----------------------------
 # CONFIGURATION
 # ----------------------------
@@ -204,7 +298,7 @@ if (not st.user.is_logged_in) and (st.session_state.profile is None):
                         result.user.user_metadata.get("name", result.user.email) if result.user.user_metadata else result.user.email,
                         result.user.user_metadata.get("avatar_url", DEFAULT_AVATAR) if result.user.user_metadata else DEFAULT_AVATAR,
                     )
-                    st.success("✅ Connexion réussie")
+                    st.toast("✅ Connexion réussie")
                     st.rerun()
                 else:
                     st.error("Connexion impossible")
@@ -237,7 +331,7 @@ if (not st.user.is_logged_in) and (st.session_state.profile is None):
                         niveau_dessin
                     )
 
-                    st.success("✅ Compte créé avec succès")
+                    st.toast("✅ Compte créé avec succès")
                     st.rerun()
                 else:
                     st.error("Inscription impossible")
@@ -271,11 +365,13 @@ st.title("🎨 Coach de dessin IA")
 # ----------------------------
 top1, top2 = st.columns([4, 1])
 
+top1, top2 = st.columns([4, 1])
+
 with top1:
-    st.subheader(f"👋 Bienvenue {st.user.name if st.user.is_logged_in else profile.get('email')}")
+    st.markdown(f"## 👋 Bienvenue {st.user.name if st.user.is_logged_in else profile.get('email')}")
 
 with top2:
-    if st.button("🚪 Déconnexion"):
+    if st.button("👋 Déconnexion"):
         if st.user.is_logged_in:
             st.logout()
         st.session_state.profile = None
@@ -290,7 +386,7 @@ left, right = st.columns([1, 3])
 
 with left:
     avatar_url = profile.get("avatar_url") or DEFAULT_AVATAR
-    st.image(avatar_url, width=100)
+    st.image(avatar_url, width=110)
 
 with right:
     st.markdown(f"**📧 {st.user.email if st.user.is_logged_in else profile.get('email')}**")
@@ -322,11 +418,62 @@ elif level < 10:
 else:
     rank = "👑 Maître"
 
-st.subheader(rank)
-st.progress(xp_in_level / 100)
-st.caption(f"{xp_in_level}/100 XP → Niveau {level+1}")
+st.markdown(f"### {rank} — Niveau {level}")
 
-st.write("---")
+st.progress(xp_in_level / 100)
+st.caption(f"{xp_in_level}/100 XP vers le niveau {level + 1}")
+
+xp = profile.get("xp", 0)
+level = xp // 100
+
+all_badges = get_all_badges()
+analyses = get_analyses(st.user.email if st.user.is_logged_in else profile.get("email"))
+analyses_count = len(analyses)
+unlocked_badges = get_badges(profile.get("xp", 0), analyses_count)
+
+with st.expander("🏅 Collection de badges", expanded=False):
+
+    cols = st.columns(2)
+
+    for i, badge in enumerate(all_badges):
+        unlocked = badge["name"] in unlocked_badges
+
+        with cols[i % 2]:
+            if unlocked:
+                st.markdown(
+                    f"""
+                    <div class="badge-card">
+                        <div style="font-size:22px">{badge['name']}</div>
+                        <div>{badge['rule']}</div>
+                        <div>✅ Débloqué</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f"""
+                    <div class="badge-card badge-locked">
+                        <div style="font-size:22px">🔒 {badge['name']}</div>
+                        <div>{badge['rule']}</div>
+                        <div>À débloquer</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+analyses = get_analyses(st.user.email if st.user.is_logged_in else profile.get("email"))
+analyses_count = len(analyses)
+
+challenge = get_daily_challenge(level)
+badges = get_badges(xp, analyses_count)
+
+st.write("")
+
+with st.expander("🎯 Défi du jour", expanded=True):
+    st.info(challenge)
+
+st.write("")
 
 # ----------------------------
 # MON PROFIL
@@ -454,7 +601,8 @@ if uploaded_file is not None:
                     xp_gained
                 )
 
-                st.success("✅ Analyse complète !")
+                st.toast("🎉 Analyse terminée !")
+                st.snow()
 
                 note = analysis.get("note", 0)
                 st.metric("⭐ Note", f"{note}/10")
@@ -477,7 +625,7 @@ if uploaded_file is not None:
 
                 st.write("**💬 Message du coach :**")
                 st.success(analysis.get("message_coach", ""))
-                st.snow()
+                st.balloons()
 
             except Exception as e:
                 st.error(f"❌ Erreur : {str(e)}")
@@ -485,41 +633,45 @@ if uploaded_file is not None:
 st.write("---")
 
 # ----------------------------
-# HISTORIQUE DES ANALYSES
+# GALERIE DES ANALYSES
 # ----------------------------
-st.subheader("📚 Historique de tes analyses")
+st.write("---")
 
-analyses = get_analyses(st.user.email if st.user.is_logged_in else profile.get("email"))
+with st.expander("🖼️ Galerie de tes analyses", expanded=True):
 
-if analyses:
-    for i, analysis in enumerate(analyses[:5]):
-        with st.expander(
-            f"📅 Analyse #{len(analyses)-i} - Note: {analysis.get('note')}/10",
-            expanded=(i == 0)
-        ):
-            h1, h2 = st.columns([1, 2])
+    analyses = get_analyses(st.user.email if st.user.is_logged_in else profile.get("email"))
 
-            with h1:
-                if analysis.get("image_url"):
-                    st.image(analysis.get("image_url"), width=200)
+    if analyses:
+        cols = st.columns(2)
 
-            with h2:
-                st.write(f"**⭐ Note :** {analysis.get('note')}/10")
+        for i, analysis in enumerate(analyses[:10]):
+            with cols[i % 2]:
+                with st.container():
+                    if analysis.get("image_url"):
+                        st.image(analysis.get("image_url"), use_container_width=True)
 
-                if analysis.get("points_forts"):
-                    st.write("**💪 Points forts :**")
-                    for point in analysis.get("points_forts"):
-                        st.write(f"• {point}")
+                    st.markdown(f"**⭐ Note : {analysis.get('note', '—')}/10**")
 
-                if analysis.get("ameliorations"):
-                    st.write("**📈 À améliorer :**")
-                    for point in analysis.get("ameliorations"):
-                        st.write(f"• {point}")
+                    if analysis.get("created_at"):
+                        st.caption(f"📅 {analysis.get('created_at')[:10]}")
 
-                if analysis.get("defi"):
-                    st.write(f"**🎯 Défi :** {analysis.get('defi')}")
+                    with st.expander("Voir les détails"):
+                        if analysis.get("points_forts"):
+                            st.write("**💪 Points forts :**")
+                            for point in analysis.get("points_forts"):
+                                st.write(f"• {point}")
 
-                if analysis.get("message_coach"):
-                    st.write(f"**💬 Coach :** {analysis.get('message_coach')}")
-else:
-    st.info("Aucune analyse pour le moment. Upload un dessin pour commencer !")
+                        if analysis.get("ameliorations"):
+                            st.write("**📈 À améliorer :**")
+                            for point in analysis.get("ameliorations"):
+                                st.write(f"• {point}")
+
+                        if analysis.get("defi"):
+                            st.write(f"**🎯 Défi :** {analysis.get('defi')}")
+
+                        if analysis.get("message_coach"):
+                            st.write(f"**💬 Coach :** {analysis.get('message_coach')}")
+
+                    st.write("")
+    else:
+        st.info("Aucune analyse pour le moment. Upload un dessin pour commencer !")
