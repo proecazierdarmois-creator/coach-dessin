@@ -99,13 +99,17 @@ def ensure_profile(email, name=None, picture=None):
 
     result = supabase.table("profiles").insert({
         "email": email,
-        "name": name,
         "avatar_url": picture or DEFAULT_AVATAR,
         "xp": 0,
+        "genre": None,
+        "age": None,
+        "niveau_dessin": None,
     }).execute()
+
     if result.data:
         return result.data[0]
-    return None
+
+    return get_profile(email=email)
 
 # ------------------------
 # CONFIG
