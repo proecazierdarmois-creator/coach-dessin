@@ -30,10 +30,14 @@ def get_profile_by_email(email):
 
 
 def ensure_profile(email, name, picture):
-    """Crée ou récupère un profil Supabase"""
     profile = get_profile_by_email(email)
 
     if profile:
+        if picture and not profile.get("avatar_url"):
+            supabase.table("profiles").update({
+                "avatar_url": picture
+            }).eq("email", email).execute()
+            profile["avatar_url"] = picture
         return profile
 
     new_profile = {
@@ -88,6 +92,8 @@ st.write("---")
 # ÉCRAN PRINCIPAL
 # ----------------------------
 profile = st.session_state.profile
+st.write("avatar_url en base :", profile.get("avatar_url"))
+st.write("photo Google :", st.user.picture)
 
 if profile:
     col1, col2 = st.columns([1, 3])
