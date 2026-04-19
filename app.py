@@ -477,6 +477,7 @@ if uploaded_file is not None:
 
                 st.write("**💬 Message du coach :**")
                 st.success(analysis.get("message_coach", ""))
+                st.balloons()
 
                 st.rerun()
 
