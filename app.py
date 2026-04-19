@@ -53,15 +53,16 @@ def get_analyses(email):
     return res.data or []
 
 def save_analysis(email, image_url, analysis):
-    supabase.table("analyses").insert({
+    result = supabase.table("analyses").insert({
         "email": email,
         "image_url": image_url,
         "note": analysis.get("note"),
-        "points_forts": analysis.get("points_forts"),
-        "ameliorations": analysis.get("ameliorations"),
-        "defi": analysis.get("defi"),
-        "message_coach": analysis.get("message_coach"),
+        "points_forts": analysis.get("points_forts", []),
+        "ameliorations": analysis.get("ameliorations", []),
+        "defi": analysis.get("defi", ""),
+        "message_coach": analysis.get("message_coach", ""),
     }).execute()
+    return result.data[0] if result.data else None
 
 def analyze(image_bytes, mime, age, niveau):
     prompt = f"""
