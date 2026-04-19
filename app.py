@@ -77,6 +77,42 @@ def update_profile(email, age, genre, niveau_dessin):
 
     return False
 
+
+def save_analysis(profile_id, image_url, analysis):
+    """Sauvegarde l'analyse dans Supabase"""
+    
+    result = supabase.table("analyses").insert({
+        "profile_id": profile_id,
+        "image_url": image_url,
+        "note": analysis.get("note"),
+        "points_forts": analysis.get("points_forts"),
+        "ameliorations": analysis.get("ameliorations"),
+        "defi": analysis.get("defi"),
+        "message_coach": analysis.get("message_coach"),
+    }).execute()
+    
+    return result.data[0] if result.data else None
+
+
+def get_analyses(profile_id):
+    """Récupère l'historique des analyses"""
+    result = supabase.table("analyses").select("*").eq("profile_id", profile_id).order("created_at", desc=True).execute()
+    return result.data or []
+
+
+def update_xp(profile_id, xp_gained):
+    """Met à jour l'XP du profil"""
+    current_xp = st.session_state.profile.get("xp", 0)
+    new_xp = current_xp + xp_gained
+    
+    result = supabase.table("profiles").update({"xp": new_xp}).eq("id", profile_id).execute()
+    
+    if result.data:
+        st.session_state.profile = result.data[0]
+        return True
+    return False
+
+
 def analyze_drawing(image_bytes, mime_type, age, niveau_dessin):
     """Analyse un dessin avec Gemini et renvoie un JSON"""
     user_prompt = f"""
@@ -273,4 +309,52 @@ if uploaded_file is not None:
                 st.success(analysis.get("message_coach", ""))
 
             except Exception as e:
-                st.error(f"❌ Erreur : {str(e)}")
+                st.error("❌ L'analyse a échoué. Réessaie avec une autre image ou relance.")
+                st.code(str(e))
+                supabase.table("analyses").insert({
+    "email": st.user.email,
+    "image_url": "temp",  # on verra l’upload juste après
+    "note": analysis.get("note"),
+    "points_forts": analysis.get("points_forts"),
+    "ameliorations": analysis.get("ameliorations"),
+    "defi": analysis.get("defi"),
+    "message_coach": analysis.get("message_coach"),
+}).execute()
+
+# ----------------------------
+# HISTORIQUE DES ANALYSES
+# ----------------------------
+st.write("")
+st.subheader("📚 Historique de tes analyses")
+
+analyses = get_analyses(profile.get("id"))
+
+if analyses:
+    for i, analysis in enumerate(analyses[:5]):  # Afficher les 5 dernières
+        with st.expander(f"📅 Analyse #{len(analyses)-i} - Note: {analysis.get('note')}/10", expanded=(i==0)):
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                if analysis.get("image_url"):
+                    st.image(analysis.get("image_url"), width=200)
+            
+            with col2:
+                st.write(f"**⭐ Note:** {analysis.get('note')}/10")
+                
+                if analysis.get("points_forts"):
+                    st.write("**💪 Points forts:**")
+                    for point in analysis.get("points_forts"):
+                        st.write(f"• {point}")
+                
+                if analysis.get("ameliorations"):
+                    st.write("**📈 À améliorer:**")
+                    for point in analysis.get("ameliorations"):
+                        st.write(f"• {point}")
+                
+                if analysis.get("defi"):
+                    st.write(f"**🎯 Défi:** {analysis.get('defi')}")
+                
+                if analysis.get("message_coach"):
+                    st.write(f"**💬 Coach:** {analysis.get('message_coach')}")
+else:
+    st.info("Aucune analyse pour le moment. Upload un dessin pour commencer !")
