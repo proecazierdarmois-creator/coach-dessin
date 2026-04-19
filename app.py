@@ -83,7 +83,39 @@ if st.session_state.profile is None:
     )
 
 st.write("---")
-st.write("✅ Vous êtes connecté")
 
-if st.session_state.profile:
-    st.write(st.session_state.profile)
+# ----------------------------
+# ÉCRAN PRINCIPAL
+# ----------------------------
+profile = st.session_state.profile
+
+if profile:
+    col1, col2 = st.columns([1, 3])
+
+    with col1:
+        st.image(profile.get("avatar_url"), width=80)
+
+    with col2:
+        st.subheader(f"{st.user.name}")
+        st.caption(f"📧 {st.user.email}")
+
+    st.write("")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("📊 XP", profile.get("xp", 0))
+
+    with col2:
+        age = profile.get("age")
+        st.metric("🎂 Âge", age if age else "—")
+
+    with col3:
+        niveau = profile.get("niveau_dessin")
+        st.metric("📚 Niveau", niveau if niveau else "—")
+
+    st.write("")
+    st.write("---")
+    st.write("🚀 Prêt à démarrer ? Sélectionne une option ci-dessous")
+else:
+    st.warning("Profil non chargé.")
