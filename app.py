@@ -266,16 +266,16 @@ profile = st.session_state.profile
 
 st.title("🎨 Coach de dessin IA")
 
-top1, top2 = st.columns([3, 1])
+# ----------------------------
+# HEADER
+# ----------------------------
+top1, top2 = st.columns([4, 1])
 
 with top1:
-    if st.user.is_logged_in:
-        st.write(f"Bienvenue {st.user.name} 👋")
-    else:
-        st.write(f"Bienvenue {profile.get('email')} 👋")
+    st.subheader(f"👋 Bienvenue {st.user.name if st.user.is_logged_in else profile.get('email')}")
 
 with top2:
-    if st.button("Déconnexion"):
+    if st.button("🚪 Déconnexion"):
         if st.user.is_logged_in:
             st.logout()
         st.session_state.profile = None
@@ -283,32 +283,48 @@ with top2:
 
 st.write("---")
 
-# Carte profil
-avatar_url = profile.get("avatar_url") or DEFAULT_AVATAR
+# ----------------------------
+# CARTE PROFIL
+# ----------------------------
+left, right = st.columns([1, 3])
 
-info1, info2 = st.columns([1, 3])
-
-with info1:
+with left:
+    avatar_url = profile.get("avatar_url") or DEFAULT_AVATAR
     st.image(avatar_url, width=100)
 
-with info2:
-    if st.user.is_logged_in:
-        st.subheader(st.user.name)
-        st.caption(f"📧 {st.user.email}")
-    else:
-        st.subheader(profile.get("email"))
-        st.caption(f"📧 {profile.get('email')}")
+with right:
+    st.markdown(f"**📧 {st.user.email if st.user.is_logged_in else profile.get('email')}**")
 
-stats1, stats2, stats3 = st.columns(3)
+    stats1, stats2, stats3 = st.columns(3)
 
-with stats1:
-    st.metric("📊 XP", profile.get("xp", 0))
+    with stats1:
+        st.metric("XP", profile.get("xp", 0))
 
-with stats2:
-    st.metric("🎂 Âge", profile.get("age") if profile.get("age") else "—")
+    with stats2:
+        st.metric("Âge", profile.get("age") or "—")
 
-with stats3:
-    st.metric("📚 Niveau", profile.get("niveau_dessin") if profile.get("niveau_dessin") else "—")
+    with stats3:
+        st.metric("Niveau dessin", profile.get("niveau_dessin") or "—")
+
+# ----------------------------
+# PROGRESSION XP
+# ----------------------------
+xp = profile.get("xp", 0)
+level = xp // 100
+xp_in_level = xp % 100
+
+if level < 2:
+    rank = "🌱 Débutant"
+elif level < 5:
+    rank = "✏️ Apprenti"
+elif level < 10:
+    rank = "🎨 Artiste"
+else:
+    rank = "👑 Maître"
+
+st.subheader(rank)
+st.progress(xp_in_level / 100)
+st.caption(f"{xp_in_level}/100 XP → Niveau {level+1}")
 
 st.write("---")
 
@@ -316,7 +332,7 @@ st.write("---")
 # MON PROFIL
 # ----------------------------
 with st.expander("⚙️ Mon profil", expanded=False):
-    p1, p2, p3 = st.columns(3)
+    p1, p2, p3, p4 = st.columns(4)
 
     with p1:
         age = st.number_input(
@@ -350,6 +366,29 @@ with st.expander("⚙️ Mon profil", expanded=False):
             options_niveau,
             index=options_niveau.index(niveau_actuel)
         )
+
+    with p4:
+        xp = profile.get("xp", 0)
+
+level = xp // 100
+xp_in_level = xp % 100
+
+# Badge
+if level < 2:
+    rank = "🌱 Débutant"
+elif level < 5:
+    rank = "✏️ Apprenti"
+elif level < 10:
+    rank = "🎨 Artiste"
+else:
+    rank = "👑 Maître"
+
+    st.subheader(rank)
+
+    # Barre XP
+    st.write(f"🏆 Niveau {level}")
+    st.progress(xp_in_level / 100)
+    st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
 
     if st.button("💾 Sauvegarder le profil"):
         success = update_profile(
