@@ -7,6 +7,8 @@ from google.genai import types
 from supabase import create_client, Client
 import uuid
 
+
+
 # ------------------------
 # SESSION STATE INIT
 # ------------------------
