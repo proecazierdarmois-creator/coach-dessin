@@ -7,7 +7,19 @@ from google.genai import types
 from supabase import create_client, Client
 import uuid
 
+import streamlit as st
 
+st.title("Test Google login")
+
+if not st.user.is_logged_in:
+    st.button("Se connecter avec Google", on_click=st.login)
+    st.stop()
+
+st.success("Connecté avec Google")
+st.write(st.user)
+
+if st.button("Se déconnecter"):
+    st.logout()
 
 # ------------------------
 # SESSION STATE INIT
