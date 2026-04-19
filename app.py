@@ -78,11 +78,9 @@ def update_profile(email, age, genre, niveau_dessin):
     return False
 
 
-def save_analysis(profile_id, image_url, analysis):
-    """Sauvegarde l'analyse dans Supabase"""
-    
+def save_analysis(email, image_url, analysis):
     result = supabase.table("analyses").insert({
-        "profile_id": profile_id,
+        "email": email,
         "image_url": image_url,
         "note": analysis.get("note"),
         "points_forts": analysis.get("points_forts"),
@@ -90,15 +88,15 @@ def save_analysis(profile_id, image_url, analysis):
         "defi": analysis.get("defi"),
         "message_coach": analysis.get("message_coach"),
     }).execute()
-    
+
     return result.data[0] if result.data else None
 
 
-def get_analyses(profile_id):
+def get_analyses(email):
     result = (
         supabase.table("analyses")
         .select("*")
-        .eq("profile_id", profile_id)
+        .eq("email", email)
         .order("created_at", desc=True)
         .execute()
     )
@@ -304,7 +302,7 @@ if uploaded_file is not None:
                 )
 
                 # Sauvegarde l'analyse
-                save_analysis(profile.get("id"), image_url, analysis)
+                save_analysis(st.user.email, image_url, analysis)
                 
                 # Met à jour l'XP
                 xp_gained = min(analysis.get("note", 0) * 5, 100)
