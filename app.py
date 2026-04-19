@@ -7,76 +7,41 @@ from google.genai import types
 from supabase import create_client, Client
 import uuid
 
-import streamlit as st
+load_dotenv()
+st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
 
-st.title("Test Google login")
+# ----------------------------
+# CONFIGURATION
+# ----------------------------
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+DEFAULT_AVATAR = "https://via.placeholder.com/150?text=Avatar"
 
+if not GEMINI_API_KEY:
+    st.error("Clé Gemini manquante dans Streamlit Secrets")
+    st.stop()
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+client = genai.Client()
+
+# Vérifier la connexion Google
 if not st.user.is_logged_in:
+    st.title("🎨 Coach de dessin IA")
     st.button("Se connecter avec Google", on_click=st.login)
     st.stop()
 
-st.success("Connecté avec Google")
-st.write(st.user)
-
+# L'utilisateur est connecté
+st.write(f"Bonjour {st.user.name} 👋")
 if st.button("Se déconnecter"):
     st.logout()
+    st.rerun()
 
-# ------------------------
-# SESSION STATE INIT
-# ------------------------
+user_email = st.user.email
+user_name = st.user.name
+user_picture = st.user.picture
 
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-if "access_token" not in st.session_state:
-    st.session_state.access_token = None
-
-if "refresh_token" not in st.session_state:
-    st.session_state.refresh_token = None
-
-def get_user_id(user):
-    if user is None:
-        return None
-    if isinstance(user, dict):
-        return user.get("id")
-    return getattr(user, "id", None)
-
-
-def get_user_email(user):
-    if user is None:
-        return None
-    if isinstance(user, dict):
-        return user.get("email")
-    return getattr(user, "email", None)
-
-
-def get_user_metadata(user):
-    if user is None:
-        return {}
-    if isinstance(user, dict):
-        return user.get("user_metadata", {}) or {}
-    return getattr(user, "user_metadata", {}) or {}
-
-
-def update_profile(user_id, age, genre, niveau_dessin):
-    result = supabase.table("profiles").upsert({
-        "id": user_id,
-        "age": age,
-        "genre": genre,
-        "niveau_dessin": niveau_dessin,
-    }).execute()
-    return result
-
-
-def get_level(xp):
-    if xp < 50:
-        return "Débutant 🟢"
-    elif xp < 150:
-        return "Intermédiaire 🔵"
-    else:
-        return "Avancé 🔴"
-
-
+# Fonctions définies après la config Supabase
 def get_profile(user_id=None, email=None):
     query = supabase.table("profiles").select("*")
     if user_id is not None:
@@ -119,10 +84,38 @@ def ensure_profile(email, name=None, picture=None):
 
     return get_profile(email=email)
 
-# ------------------------
-# CONFIG
-# ------------------------
-DEFAULT_AVATAR = "https://via.placeholder.com/150?text=Avatar"
+
+# Créer ou récupérer le profil de l'utilisateur
+try:
+    profile = ensure_profile(user_email, user_name, user_picture)
+except Exception as e:
+    st.error(f"Erreur lors de la création du profil: {e}")
+    st.stop()
+
+
+# Fonctions utilitaires
+def get_user_id(user):
+    if user is None:
+        return None
+    if isinstance(user, dict):
+        return user.get("id")
+    return getattr(user, "id", None)
+
+
+def get_user_email(user):
+    if user is None:
+        return None
+    if isinstance(user, dict):
+        return user.get("email")
+    return getattr(user, "email", None)
+
+
+def get_user_metadata(user):
+    if user is None:
+        return {}
+    if isinstance(user, dict):
+        return user.get("user_metadata", {}) or {}
+    return getattr(user, "user_metadata", {}) or {}
 
 
 # ------------------------
@@ -180,8 +173,26 @@ def upload_image(user_id, uploaded):
         {"content-type": mime_type}
     )
 
-    public_url = supabase.storage.from_("drawings").get_public_url(file_name)
-    return public_url
+
+# Fonctions pour mettre à jour la base de données
+def update_profile(user_id, age, genre, niveau_dessin):
+    result = supabase.table("profiles").upsert({
+        "id": user_id,
+        "age": age,
+        "genre": genre,
+        "niveau_dessin": niveau_dessin,
+    }).execute()
+    return result
+
+
+def get_level(xp):
+    if xp < 50:
+        return "Débutant 🟢"
+    elif xp < 150:
+        return "Intermédiaire 🔵"
+    else:
+        return "Avancé 🔴"
+
 
 def save_profile(user):
     metadata = get_user_metadata(user)
@@ -224,54 +235,8 @@ def get_analyses(user_id):
     )
     return result.data or []
 
-load_dotenv()
 
-st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
-
-# ----------------------------
-# Config
-# ----------------------------
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-
-if not GEMINI_API_KEY:
-    st.error("Clé Gemini manquante dans Streamlit Secrets")
-    st.stop()
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-if "access_token" in st.session_state and "refresh_token" in st.session_state:
-    try:
-        session_response = supabase.auth.set_session(
-            st.session_state.access_token,
-            st.session_state.refresh_token
-        )
-
-        if "user" not in st.session_state or st.session_state.user is None:
-            st.session_state.user = session_response.user
-    except Exception:
-        st.session_state.user = None
-
-# Cas 2 : session déjà connue
-elif st.session_state.access_token and st.session_state.refresh_token:
-    try:
-        session = supabase.auth.set_session(
-            st.session_state.access_token,
-            st.session_state.refresh_token
-        )
-        st.session_state.user = session.user
-    except Exception:
-        st.session_state.user = None
-
-client = genai.Client()
-
-# ----------------------------
-# Session state
-# ----------------------------
-if "user" not in st.session_state:
-    st.session_state.user = None
-
+# Session state init
 if "xp" not in st.session_state:
     st.session_state.xp = 0
 
@@ -280,10 +245,6 @@ if "badges" not in st.session_state:
 
 if "historique" not in st.session_state:
     st.session_state.historique = []
-
-# ----------------------------
-# Helpers
-# ----------------------------
 def calcul_niveau(xp: int) -> int:
     return 1 + xp // 30
 
