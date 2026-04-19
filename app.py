@@ -25,6 +25,27 @@ if not GEMINI_API_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 client = genai.Client()
 
+# ----------------------------
+# SESSION STATE INITIALIZATION
+# ----------------------------
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+if "access_token" not in st.session_state:
+    st.session_state.access_token = None
+
+if "refresh_token" not in st.session_state:
+    st.session_state.refresh_token = None
+
+if "xp" not in st.session_state:
+    st.session_state.xp = 0
+
+if "badges" not in st.session_state:
+    st.session_state.badges = []
+
+if "historique" not in st.session_state:
+    st.session_state.historique = []
+
 # Vérifier la connexion Google
 if not st.user.is_logged_in:
     st.title("🎨 Coach de dessin IA")
@@ -236,15 +257,6 @@ def get_analyses(user_id):
     return result.data or []
 
 
-# Session state init
-if "xp" not in st.session_state:
-    st.session_state.xp = 0
-
-if "badges" not in st.session_state:
-    st.session_state.badges = []
-
-if "historique" not in st.session_state:
-    st.session_state.historique = []
 def calcul_niveau(xp: int) -> int:
     return 1 + xp // 30
 
