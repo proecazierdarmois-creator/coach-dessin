@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from supabase import create_client, Client
-import os
 import uuid
 
 # ------------------------
@@ -21,15 +20,39 @@ if "access_token" not in st.session_state:
 if "refresh_token" not in st.session_state:
     st.session_state.refresh_token = None
 
+def get_user_id(user):
+    if user is None:
+        return None
+    if isinstance(user, dict):
+        return user.get("id")
+    return getattr(user, "id", None)
+
+
+def get_user_email(user):
+    if user is None:
+        return None
+    if isinstance(user, dict):
+        return user.get("email")
+    return getattr(user, "email", None)
+
+
+def get_user_metadata(user):
+    if user is None:
+        return {}
+    if isinstance(user, dict):
+        return user.get("user_metadata", {}) or {}
+    return getattr(user, "user_metadata", {}) or {}
+
+
 def update_profile(user_id, age, genre, niveau_dessin):
-    return supabase.table("profiles").upsert({
+    result = supabase.table("profiles").upsert({
         "id": user_id,
         "age": age,
         "genre": genre,
         "niveau_dessin": niveau_dessin,
     }).execute()
-
     return result
+
 
 def get_level(xp):
     if xp < 50:
@@ -39,9 +62,37 @@ def get_level(xp):
     else:
         return "Avancé 🔴"
 
-def get_profile(user_id):
-    result = supabase.table("profiles").select("*").eq("id", user_id).execute()
-    
+
+def get_profile(user_id=None, email=None):
+    query = supabase.table("profiles").select("*")
+    if user_id is not None:
+        query = query.eq("id", user_id)
+    elif email:
+        query = query.eq("email", email)
+    else:
+        return None
+
+    result = query.execute()
+    if result.data:
+        return result.data[0]
+    return None
+
+
+def get_profile_by_email(email):
+    return get_profile(email=email)
+
+
+def ensure_profile(email, name=None, picture=None):
+    profile = get_profile(email=email)
+    if profile:
+        return profile
+
+    result = supabase.table("profiles").insert({
+        "email": email,
+        "name": name,
+        "avatar_url": picture or DEFAULT_AVATAR,
+        "xp": 0,
+    }).execute()
     if result.data:
         return result.data[0]
     return None
@@ -92,7 +143,6 @@ def get_avatar(profile):
         return profile.get("avatar_url")
     return DEFAULT_AVATAR
 
-import uuid
 
 def upload_image(user_id, uploaded):
     file_bytes = uploaded.getvalue()
@@ -112,22 +162,17 @@ def upload_image(user_id, uploaded):
     return public_url
 
 def save_profile(user):
-    metadata = user.user_metadata or {}
+    metadata = get_user_metadata(user)
+    user_id = get_user_id(user)
+    email = get_user_email(user)
 
     supabase.table("profiles").upsert({
-        "id": user.id,
-        "email": user.email,
+        "id": user_id,
+        "email": email,
         "age": metadata.get("age"),
         "genre": metadata.get("genre"),
         "niveau_dessin": metadata.get("niveau_dessin"),
     }).execute()
-
-
-def get_profile(user_id):
-    result = supabase.table("profiles").select("*").eq("id", user_id).execute()
-    if result.data:
-        return result.data[0]
-    return None
 
 
 def update_xp(user_id, xp):
@@ -166,12 +211,6 @@ st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
 # ----------------------------
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
 if not GEMINI_API_KEY:
@@ -199,36 +238,6 @@ if st.session_state.user is not None:
     if "code" in query_params:
         st.query_params.clear()
         st.rerun()
-
-query_params = st.query_params
-
-# Si déjà connecté, on nettoie le code éventuel
-if st.session_state.user is not None:
-    if "code" in query_params:
-        st.query_params.clear()
-        st.rerun()
-
-# Sinon seulement, on essaie de traiter un retour Google
-elif "code" in query_params:
-    try:
-        auth_code = query_params["code"]
-
-        session = supabase.auth.exchange_code_for_session({
-            "auth_code": auth_code
-        })
-
-        st.session_state.user = session.user
-        st.session_state.access_token = session.session.access_token
-        st.session_state.refresh_token = session.session.refresh_token
-
-        save_profile(session.user)
-
-        st.query_params.clear()
-        st.rerun()
-
-    except Exception as e:
-        st.error("Erreur Google")
-        st.code(str(e))
 
 # Cas 2 : session déjà connue
 elif st.session_state.access_token and st.session_state.refresh_token:
@@ -299,7 +308,7 @@ Tu aides à améliorer les bases du dessin : formes, proportions, ombres.
 """
 }
 
-def analyse_dessin(image_bytes, mime_type, style, coach, theme):
+def analyse_dessin(image_bytes, mime_type, style, coach, theme, age=11, niveau_dessin="Débutant"):
     system_prompt = personnalites[coach]
 
     prompt = f"""
@@ -372,98 +381,72 @@ def sign_out():
 # Auth UI
 # ----------------------------
 st.write("USER SESSION:", st.session_state.user)
-st.write("QUERY PARAMS:", st.query_params)
-if st.session_state.user is None:
+st.write("STREAMLIT USER LOGGED IN:", st.user.is_logged_in)
+
+if (not st.user.is_logged_in) and (st.session_state.user is None):
     st.title("🎨 Coach de dessin IA")
     st.subheader("Connexion / Inscription")
 
     st.markdown("### 🔐 Connexion rapide")
+    st.button("🔵 Se connecter avec Google", on_click=st.login)
 
-if st.button("🔵 Se connecter avec Google"):
-    response = supabase.auth.sign_in_with_oauth({
-        "provider": "google",
-        "options": {
-            "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
-        }
-    })
-    st.link_button("Continuer avec Google", response.url)
+    st.divider()
 
-st.divider()
+    mode = st.radio("Choisis une action", ["Connexion", "Inscription"], horizontal=True)
 
-mode = st.radio("Choisis une action", ["Connexion", "Inscription"], horizontal=True)
-
-with st.form("auth_form"):
+    with st.form("auth_form"):
         email = st.text_input("Email")
         password = st.text_input("Mot de passe", type="password")
-
-        if mode == "Inscription":
-            genre = st.selectbox(
-                "Genre (optionnel)",
-                ["Je préfère ne pas dire", "Fille", "Garçon", "Non-binaire", "Autre"]
-            )
-            age = st.number_input("Âge", min_value=4, max_value=100, value=11, step=1)
-            niveau_dessin = st.selectbox(
-                "Niveau en dessin",
-                ["Débutant", "Intermédiaire", "Avancé"]
-            )
-
         submitted = st.form_submit_button("Valider")
 
-if submitted:
+    if submitted:
         try:
-            if mode == "Inscription":
-                result = sign_up(email, password, genre, int(age), niveau_dessin)
-                st.success("Compte créé.")
-                user = getattr(result, "user", None)
-                session = getattr(result, "session", None)
-                if session and user:
-                    st.session_state.user = user
-                    st.session_state.access_token = session.access_token
-                    st.session_state.refresh_token = session.refresh_token
-
-                    save_profile(user)
-
-                    st.rerun()
-
-            else:
+            if mode == "Connexion":
                 result = sign_in(email, password)
                 if result and result.user:
                     st.session_state.user = result.user
                     st.session_state.access_token = result.session.access_token
                     st.session_state.refresh_token = result.session.refresh_token
-
-                    profile = get_profile(result.user.id)
-                    if profile:
-                        st.session_state.xp = profile.get("xp", 0)
-
                     save_profile(result.user)
-
-                    st.success("Connexion réussie.")
-                    st.rerun()
-                if result and result.user:
-                    st.session_state.user = result.user
-                    st.session_state.access_token = result.session.access_token
-                    st.session_state.refresh_token = result.session.refresh_token
-
-                    save_profile(result.user)
-
                     st.success("Connexion réussie.")
                     st.rerun()
                 else:
                     st.error("Connexion impossible.")
-
+            else:
+                st.error("Garde ici ton bloc d'inscription actuel.")
         except Exception as e:
             st.error("Erreur d'authentification")
             st.code(str(e))
 
-st.stop()
+    st.stop()
+
+# ----------------------------
+# Sync utilisateur Google → session + Supabase
+# ----------------------------
+if st.user.is_logged_in and st.session_state.user is None:
+    user_email = st.user.email
+    user_name = getattr(st.user, "name", user_email)
+    user_picture = getattr(st.user, "picture", None)
+
+    profile = get_profile_by_email(user_email)
+    if not profile:
+        profile = ensure_profile(user_email, user_name, user_picture)
+
+    st.session_state.user = {
+        "id": profile.get("id") if profile else None,
+        "email": user_email,
+        "name": user_name,
+        "picture": user_picture
+    }
+
+    st.rerun()  # 🔥 important pour rafraîchir l'app
 
 # ----------------------------
 # App protégée
 # ----------------------------
 user = st.session_state.user
-profile = get_profile(user.id)
-st.write("USER ID:", user.id)
+profile = get_profile(user_id=get_user_id(user), email=get_user_email(user))
+st.write("USER ID:", get_user_id(user))
 
 st.write("PROFILE ID:", profile.get("id") if profile else None)
 xp = profile.get("xp", 0) if profile else 0
@@ -474,7 +457,7 @@ if profile:
 else:
     avatar_url = None
 
-    st.divider()
+st.divider()
 st.subheader("👤 Mon profil")
 
 current_age = profile.get("age") if profile else 11
@@ -499,7 +482,7 @@ with st.form("profile_form"):
 
 if save_profile_button:
     try:
-        result = update_profile(user.id, int(new_age), new_genre, new_niveau)
+        result = update_profile(get_user_id(user), int(new_age), new_genre, new_niveau)
         st.write(result)
         st.success("Profil mis à jour")
         st.rerun()
@@ -507,12 +490,12 @@ if save_profile_button:
         st.error("Erreur lors de la mise à jour du profil")
         st.code(str(e))
 
-metadata = user.user_metadata or {}
+metadata = get_user_metadata(user)
 
 age = metadata.get("age", 11)
 niveau_dessin = metadata.get("niveau_dessin", "Débutant")
 
-profile = get_profile(user.id)
+profile = get_profile(user_id=get_user_id(user), email=get_user_email(user))
 
 genre = profile.get("genre", "Non renseigné") if profile else "Non renseigné"
 age = profile.get("age", "Non renseigné") if profile else "Non renseigné"
@@ -526,14 +509,14 @@ with col1:
     st.image(avatar_url, width=100)
 
 with col2:
-    st.markdown(f"### 👤 {user.email}")
+    st.markdown(f"### 👤 {get_user_email(user)}")
     st.write(f"🎯 XP : **{xp}**")
     st.write(f"🏆 Niveau : **{niveau_label}**")
 st.write(f"Genre : **{genre}**")
 st.write(f"Âge : **{age}**")
 
 st.title("🎨 Coach de dessin IA")
-st.write(f"Connecté : **{user.email}**")
+st.write(f"Connecté : **{get_user_email(user)}**")
 
 col1, col2 = st.columns([3, 1])
 with col2:
@@ -567,7 +550,7 @@ else:
 
 if uploaded:
     st.image(uploaded, caption="Ton dessin", use_container_width=True)
-    image_url = upload_image(user.id, uploaded)
+    image_url = upload_image(get_user_id(user), uploaded)
     
     if st.button("Analyser mon dessin"):
         image_bytes = uploaded.read()
@@ -575,7 +558,7 @@ if uploaded:
 
         with st.spinner("Analyse en cours..."):
             try:
-                fb = analyse_dessin(image_bytes, mime_type, style, coach, theme)
+                fb = analyse_dessin(image_bytes, mime_type, style, coach, theme, age=age, niveau_dessin=niveau_dessin)
 
                 note = int(fb["note"])
                 gain_xp = note * 5
@@ -622,7 +605,7 @@ if uploaded:
 st.divider()
 st.subheader("📚 Historique")
 
-historique = get_analyses(user.id)
+historique = get_analyses(get_user_id(user))
 
 if historique:
     for item in historique:
