@@ -152,87 +152,134 @@ Réponds uniquement en JSON avec cette structure :
     return json.loads(response.text)
 
 # ----------------------------
-# LOGIN GOOGLE
+# LOGIN UI
 # ----------------------------
-if not st.user.is_logged_in:
+if (not st.user.is_logged_in) and (st.session_state.profile is None):
     st.title("🎨 Coach de dessin IA")
-    st.write("Connecte-toi avec Google pour commencer")
-    st.button("Se connecter avec Google", on_click=st.login)
+    st.subheader("Connexion / Inscription")
+
+    st.markdown("### 🔐 Connexion rapide")
+    st.button("🔵 Se connecter avec Google", on_click=st.login)
+
+    st.divider()
+
+    mode = st.radio("Choisis une action", ["Connexion", "Inscription"], horizontal=True)
+
+    with st.form("auth_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Mot de passe", type="password")
+
+        if mode == "Inscription":
+            genre = st.selectbox(
+                "Genre",
+                ["Je préfère ne pas dire", "Fille", "Garçon", "Non-binaire", "Autre"]
+            )
+
+            age = st.number_input(
+                "Âge",
+                min_value=5,
+                max_value=100,
+                value=10,
+                step=1
+            )
+
+            niveau_dessin = st.selectbox(
+                "Niveau en dessin",
+                ["Débutant", "Intermédiaire", "Avancé"]
+            )
+
+        submitted = st.form_submit_button("Valider")
+
+    if submitted:
+        try:
+            if mode == "Connexion":
+                result = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password,
+                })
+
+                if result and result.user:
+                    st.session_state.profile = ensure_profile(
+                        result.user.email,
+                        result.user.user_metadata.get("name", result.user.email) if result.user.user_metadata else result.user.email,
+                        result.user.user_metadata.get("avatar_url", DEFAULT_AVATAR) if result.user.user_metadata else DEFAULT_AVATAR,
+                    )
+                    st.success("✅ Connexion réussie")
+                    st.rerun()
+                else:
+                    st.error("Connexion impossible")
+
+            else:
+                result = supabase.auth.sign_up({
+                    "email": email,
+                    "password": password,
+                    "options": {
+                        "data": {
+                            "genre": genre,
+                            "age": age,
+                            "niveau_dessin": niveau_dessin,
+                        }
+                    }
+                })
+
+                user = getattr(result, "user", None)
+                if user:
+                    st.session_state.profile = ensure_profile(
+                        email,
+                        email,
+                        DEFAULT_AVATAR,
+                    )
+
+                    update_profile(
+                        email,
+                        age,
+                        genre if genre != "Je préfère ne pas dire" else None,
+                        niveau_dessin
+                    )
+
+                    st.success("✅ Compte créé avec succès")
+                    st.rerun()
+                else:
+                    st.error("Inscription impossible")
+
+        except Exception as e:
+            st.error("Erreur d'authentification")
+            st.code(str(e))
+
     st.stop()
 
-# L'utilisateur est connecté
-st.title("🎨 Coach de dessin IA")
-
-col1, col2 = st.columns([3, 1])
-
-with col1:
-    st.write(f"Bienvenue {st.user.name} 👋")
-
-with col2:
-    if st.button("Déconnexion"):
-        st.logout()
-        st.stop()
-
-# Charger/créer le profil
-if st.session_state.profile is None:
+# ----------------------------
+# SYNC GOOGLE -> PROFIL
+# ----------------------------
+if st.user.is_logged_in and st.session_state.profile is None:
     st.session_state.profile = ensure_profile(
         st.user.email,
         st.user.name,
         st.user.picture
     )
-
-st.write("---")
+    st.rerun()
 
 # ----------------------------
-# ÉCRAN PRINCIPAL
+# ÉCRAN CONNECTÉ
 # ----------------------------
 profile = st.session_state.profile
 
-if profile:
-    col1, col2 = st.columns([1, 3])
+st.title("🎨 Coach de dessin IA")
 
-    with col1:
-        avatar_url = profile.get("avatar_url") or DEFAULT_AVATAR
-        st.image(avatar_url, width=80)
+col1, col2 = st.columns([3, 1])
 
-    with col2:
-        st.subheader(f"{st.user.name}")
-        st.caption(f"📧 {st.user.email}")
+with col1:
+    if st.user.is_logged_in:
+        st.write(f"Bienvenue {st.user.name} 👋")
+    else:
+        st.write(f"Bienvenue {profile.get('email')} 👋")
 
-    st.write("")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("📊 XP", profile.get("xp", 0))
-
-    with col2:
-        xp = profile.get("xp", 0)
-        level = xp // 100
-        xp_in_level = xp % 100
-
-        st.write(f"🏆 Niveau {level}")
-        st.progress(xp_in_level / 100)
-        st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
-
-        if level < 2:
-            rank = "🌱 Débutant"
-        elif level < 5:
-            rank = "✏️ Apprenti"
-        elif level < 10:
-            rank = "🎨 Artiste"
-        else:
-            rank = "👑 Maître"
-
-        st.subheader(rank)
-
-    with col3:
-        age = profile.get("age")
-        st.metric("🎂 Âge", age if age else "—")
-
-    st.write("")
-    st.write("---")
-    st.write("🚀 Prêt à démarrer ? Sélectionne une option ci-dessous")
+with col2:
+    if st.button("Déconnexion"):
+        if st.user.is_logged_in:
+            st.logout()
+        st.session_state.profile = None
+        st.rerun()
 
     # ----------------------------
     # MON PROFIL
