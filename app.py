@@ -164,19 +164,19 @@ st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
 # ----------------------------
 # Config
 # ----------------------------
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-    st.error("SUPABASE_URL ou SUPABASE_ANON_KEY manque dans .env")
-    st.stop()
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
 if not GEMINI_API_KEY:
     st.error("GEMINI_API_KEY manque dans .env")
     st.stop()
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 if "access_token" in st.session_state and "refresh_token" in st.session_state:
     try:
@@ -190,9 +190,24 @@ if "access_token" in st.session_state and "refresh_token" in st.session_state:
     except Exception:
         st.session_state.user = None
 
+        query_params = st.query_params
+
+# Si on est déjà connecté, on nettoie l'URL et on continue
+if st.session_state.user is not None:
+    if "code" in query_params:
+        st.query_params.clear()
+        st.rerun()
+
 query_params = st.query_params
 
-if "code" in query_params:
+# Si déjà connecté, on nettoie le code éventuel
+if st.session_state.user is not None:
+    if "code" in query_params:
+        st.query_params.clear()
+        st.rerun()
+
+# Sinon seulement, on essaie de traiter un retour Google
+elif "code" in query_params:
     try:
         auth_code = query_params["code"]
 
