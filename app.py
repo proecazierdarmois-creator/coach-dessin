@@ -343,7 +343,17 @@ if uploaded_file is not None:
 st.write("")
 st.subheader("📚 Historique de tes analyses")
 
-analyses = get_analyses(profile.get("id"))
+def get_analyses(email):
+    result = (
+        supabase.table("analyses")
+        .select("*")
+        .eq("email", email)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+analyses = get_analyses(st.user.email)
 
 if analyses:
     for i, analysis in enumerate(analyses[:5]):  # Afficher les 5 dernières
