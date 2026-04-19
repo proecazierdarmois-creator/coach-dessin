@@ -172,8 +172,10 @@ SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+
 if not GEMINI_API_KEY:
-    st.error("GEMINI_API_KEY manque dans .env")
+    st.error("Clé Gemini manquante dans Streamlit Secrets")
     st.stop()
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
