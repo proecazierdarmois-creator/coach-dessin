@@ -8,6 +8,7 @@ st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
 # ----------------------------
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
+DEFAULT_AVATAR = "https://via.placeholder.com/150?text=Avatar"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
@@ -16,6 +17,40 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 # ----------------------------
 if "profile" not in st.session_state:
     st.session_state.profile = None
+
+# ----------------------------
+# FONCTIONS PROFIL
+# ----------------------------
+def get_profile_by_email(email):
+    """Récupère le profil Supabase par email"""
+    result = supabase.table("profiles").select("*").eq("email", email).execute()
+    if result.data:
+        return result.data[0]
+    return None
+
+
+def ensure_profile(email, name, picture):
+    """Crée ou récupère un profil Supabase"""
+    profile = get_profile_by_email(email)
+
+    if profile:
+        return profile
+
+    new_profile = {
+        "email": email,
+        "avatar_url": picture or DEFAULT_AVATAR,
+        "xp": 0,
+        "genre": None,
+        "age": None,
+        "niveau_dessin": None,
+    }
+
+    result = supabase.table("profiles").insert(new_profile).execute()
+
+    if result.data:
+        return result.data[0]
+
+    return None
 
 # ----------------------------
 # LOGIN GOOGLE
@@ -39,5 +74,16 @@ with col2:
         st.logout()
         st.stop()
 
+# Charger/créer le profil
+if st.session_state.profile is None:
+    st.session_state.profile = ensure_profile(
+        st.user.email,
+        st.user.name,
+        st.user.picture
+    )
+
 st.write("---")
 st.write("✅ Vous êtes connecté")
+
+if st.session_state.profile:
+    st.write(st.session_state.profile)
