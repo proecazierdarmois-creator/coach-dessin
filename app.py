@@ -78,9 +78,10 @@ def update_profile(email, age, genre, niveau_dessin):
     return False
 
 
-def save_analysis(email, image_url, analysis):
+def save_analysis(profile_id, image_url, analysis):
+    """Sauvegarde l'analyse dans Supabase"""
     result = supabase.table("analyses").insert({
-        "email": email,
+        "profile_id": profile_id,
         "image_url": image_url,
         "note": analysis.get("note"),
         "points_forts": analysis.get("points_forts"),
@@ -92,11 +93,12 @@ def save_analysis(email, image_url, analysis):
     return result.data[0] if result.data else None
 
 
-def get_analyses(email):
+def get_analyses(profile_id):
+    """Récupère l'historique des analyses"""
     result = (
         supabase.table("analyses")
         .select("*")
-        .eq("email", email)
+        .eq("profile_id", profile_id)
         .order("created_at", desc=True)
         .execute()
     )
@@ -114,6 +116,23 @@ def update_xp(profile_id, xp_gained):
         st.session_state.profile = result.data[0]
         return True
     return False
+
+
+def update_xp(email, xp_gain):
+    profile = get_profile_by_email(email)
+    current_xp = profile.get("xp", 0) if profile else 0
+    new_xp = current_xp + xp_gain
+
+    result = supabase.table("profiles").update({
+        "xp": new_xp
+    }).eq("email", email).execute()
+
+    if result.data:
+        st.session_state.profile = result.data[0]
+
+    return new_xp
+
+st.rerun()
 
 
 def analyze_drawing(image_bytes, mime_type, age, niveau_dessin):
@@ -196,16 +215,36 @@ if profile:
 
     st.write("")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.metric("📊 XP", profile.get("xp", 0))
 
     with col2:
+        xp = profile.get("xp", 0)
+        level = xp // 100
+        xp_in_level = xp % 100
+
+        st.write(f"🏆 Niveau {level}")
+        st.progress(xp_in_level / 100)
+        st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
+
+        if level < 2:
+            rank = "🌱 Débutant"
+        elif level < 5:
+            rank = "✏️ Apprenti"
+        elif level < 10:
+            rank = "🎨 Artiste"
+        else:
+            rank = "👑 Maître"
+
+        st.subheader(rank)
+
+    with col3:
         age = profile.get("age")
         st.metric("🎂 Âge", age if age else "—")
 
-    with col3:
+    with col4:
         niveau = profile.get("niveau_dessin")
         st.metric("📚 Niveau", niveau if niveau else "—")
 
@@ -302,7 +341,7 @@ if uploaded_file is not None:
                 )
 
                 # Sauvegarde l'analyse
-                save_analysis(st.user.email, image_url, analysis)
+                save_analysis(profile.get("id"), image_url, analysis)
                 
                 # Met à jour l'XP
                 xp_gained = min(analysis.get("note", 0) * 5, 100)
@@ -341,17 +380,7 @@ if uploaded_file is not None:
 st.write("")
 st.subheader("📚 Historique de tes analyses")
 
-def get_analyses(email):
-    result = (
-        supabase.table("analyses")
-        .select("*")
-        .eq("email", email)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return result.data or []
-
-analyses = get_analyses(st.user.email)
+analyses = get_analyses(profile.get("id"))
 
 if analyses:
     for i, analysis in enumerate(analyses[:5]):  # Afficher les 5 dernières
