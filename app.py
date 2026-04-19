@@ -56,6 +56,22 @@ def ensure_profile(email, name, picture):
 
     return None
 
+def update_profile(email, age, genre, niveau_dessin):
+    """Met à jour le profil dans Supabase"""
+    update_data = {
+        "age": age if age else None,
+        "genre": genre if genre else None,
+        "niveau_dessin": niveau_dessin if niveau_dessin else None,
+    }
+
+    result = supabase.table("profiles").update(update_data).eq("email", email).execute()
+
+    if result.data:
+        st.session_state.profile = result.data[0]
+        return True
+
+    return False
+
 # ----------------------------
 # LOGIN GOOGLE
 # ----------------------------
@@ -92,8 +108,6 @@ st.write("---")
 # ÉCRAN PRINCIPAL
 # ----------------------------
 profile = st.session_state.profile
-st.write("avatar_url en base :", profile.get("avatar_url"))
-st.write("photo Google :", st.user.picture)
 
 if profile:
     col1, col2 = st.columns([1, 3])
@@ -126,3 +140,56 @@ if profile:
     st.write("🚀 Prêt à démarrer ? Sélectionne une option ci-dessous")
 else:
     st.warning("Profil non chargé.")
+
+    # ----------------------------
+# MON PROFIL
+# ----------------------------
+with st.expander("⚙️ Mon profil", expanded=False):
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        age = st.number_input(
+            "🎂 Quel est ton âge ?",
+            min_value=5,
+            max_value=100,
+            value=profile.get("age") or 10,
+            step=1
+        )
+
+    with col2:
+        options_genre = ["—", "Homme", "Femme", "Autre"]
+        genre_actuel = profile.get("genre") or "—"
+        if genre_actuel not in options_genre:
+            genre_actuel = "—"
+
+        genre = st.selectbox(
+            "⚧ Genre",
+            options_genre,
+            index=options_genre.index(genre_actuel)
+        )
+
+    with col3:
+        options_niveau = ["—", "Débutant", "Intermédiaire", "Avancé"]
+        niveau_actuel = profile.get("niveau_dessin") or "—"
+        if niveau_actuel not in options_niveau:
+            niveau_actuel = "—"
+
+        niveau = st.selectbox(
+            "📚 Niveau de dessin",
+            options_niveau,
+            index=options_niveau.index(niveau_actuel)
+        )
+
+    if st.button("💾 Sauvegarder le profil"):
+        success = update_profile(
+            st.user.email,
+            age,
+            genre if genre != "—" else None,
+            niveau if niveau != "—" else None
+        )
+
+        if success:
+            st.success("✅ Profil mis à jour !")
+            st.rerun()
+        else:
+            st.error("❌ Erreur lors de la mise à jour")
