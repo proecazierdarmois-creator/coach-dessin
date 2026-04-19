@@ -78,10 +78,10 @@ def update_profile(email, age, genre, niveau_dessin):
     return False
 
 
-def save_analysis(profile_id, image_url, analysis):
+def save_analysis(email, image_url, analysis):
     """Sauvegarde l'analyse dans Supabase"""
     result = supabase.table("analyses").insert({
-        "profile_id": profile_id,
+        "email": email,
         "image_url": image_url,
         "note": analysis.get("note"),
         "points_forts": analysis.get("points_forts"),
@@ -93,30 +93,33 @@ def save_analysis(profile_id, image_url, analysis):
     return result.data[0] if result.data else None
 
 
-def get_analyses(profile_id):
-    """Récupère l'historique des analyses"""
+def get_analyses(email):
     result = (
         supabase.table("analyses")
         .select("*")
-        .eq("profile_id", profile_id)
+        .eq("email", email)
         .order("created_at", desc=True)
         .execute()
     )
     return result.data or []
 
 
-def update_xp(profile_id, xp_gained):
+def update_xp(email, xp_gained):
     """Met à jour l'XP du profil"""
     current_xp = st.session_state.profile.get("xp", 0)
     new_xp = current_xp + xp_gained
-    
-    result = supabase.table("profiles").update({"xp": new_xp}).eq("id", profile_id).execute()
-    
+
+    result = (
+        supabase.table("profiles")
+        .update({"xp": new_xp})
+        .eq("email", email)
+        .execute()
+    )
+
     if result.data:
         st.session_state.profile = result.data[0]
-        return True
-    return False
 
+    return new_xp
 
 def analyze_drawing(image_bytes, mime_type, age, niveau_dessin):
     """Analyse un dessin avec Gemini et renvoie un JSON"""
@@ -324,11 +327,11 @@ if profile:
                     )
 
                     # Sauvegarde l'analyse
-                    save_analysis(profile.get("id"), image_url, analysis)
+                    save_analysis(st.user.email, image_url, analysis)
                     
                     # Met à jour l'XP
                     xp_gained = min(analysis.get("note", 0) * 5, 100)
-                    update_xp(profile.get("id"), xp_gained)
+                    update_xp(st.user.email, xp_gained)
 
                     st.success("✅ Analyse complète !")
 
@@ -363,7 +366,7 @@ if profile:
     st.write("")
     st.subheader("📚 Historique de tes analyses")
 
-    analyses = get_analyses(profile.get("id"))
+    analyses = get_analyses(st.user.email)
 
     if analyses:
         for i, analysis in enumerate(analyses[:5]):  # Afficher les 5 dernières
