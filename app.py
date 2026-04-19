@@ -372,9 +372,6 @@ def sign_out():
 # ----------------------------
 # Auth UI
 # ----------------------------
-st.write("USER SESSION:", st.session_state.user)
-st.write("STREAMLIT USER LOGGED IN:", st.user.is_logged_in)
-
 if (not st.user.is_logged_in) and (st.session_state.user is None):
     st.title("🎨 Coach de dessin IA")
     st.subheader("Connexion / Inscription")
@@ -384,13 +381,37 @@ if (not st.user.is_logged_in) and (st.session_state.user is None):
 
     st.divider()
 
+    # 👇 👉 ICI TU METS TON BLOC
     mode = st.radio("Choisis une action", ["Connexion", "Inscription"], horizontal=True)
 
     with st.form("auth_form"):
         email = st.text_input("Email")
         password = st.text_input("Mot de passe", type="password")
+
+        if mode == "Inscription":
+            genre = st.selectbox(
+                "Genre",
+                ["Je préfère ne pas dire", "Fille", "Garçon", "Non-binaire", "Autre"]
+            )
+
+            age = st.number_input(
+                "Âge",
+                min_value=4,
+                max_value=100,
+                value=11,
+                step=1
+            )
+
+            niveau_dessin = st.selectbox(
+                "Niveau en dessin",
+                ["Débutant", "Intermédiaire", "Avancé"]
+            )
+
         submitted = st.form_submit_button("Valider")
 
+    # ----------------------------
+    # Traitement
+    # ----------------------------
     if submitted:
         try:
             if mode == "Connexion":
@@ -404,8 +425,21 @@ if (not st.user.is_logged_in) and (st.session_state.user is None):
                     st.rerun()
                 else:
                     st.error("Connexion impossible.")
-            else:
-                st.error("Garde ici ton bloc d'inscription actuel.")
+
+            else:  # Inscription
+                result = sign_up(email, password, genre, int(age), niveau_dessin)
+                st.success("Compte créé.")
+
+                user = getattr(result, "user", None)
+                session = getattr(result, "session", None)
+
+                if session and user:
+                    st.session_state.user = user
+                    st.session_state.access_token = session.access_token
+                    st.session_state.refresh_token = session.refresh_token
+                    save_profile(user)
+                    st.rerun()
+
         except Exception as e:
             st.error("Erreur d'authentification")
             st.code(str(e))
