@@ -479,8 +479,6 @@ if uploaded_file is not None:
                 st.success(analysis.get("message_coach", ""))
                 st.balloons()
 
-                st.rerun()
-
             except Exception as e:
                 st.error(f"❌ Erreur : {str(e)}")
 
