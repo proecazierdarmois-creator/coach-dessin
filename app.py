@@ -231,14 +231,6 @@ if "access_token" in st.session_state and "refresh_token" in st.session_state:
     except Exception:
         st.session_state.user = None
 
-        query_params = st.query_params
-
-# Si on est déjà connecté, on nettoie l'URL et on continue
-if st.session_state.user is not None:
-    if "code" in query_params:
-        st.query_params.clear()
-        st.rerun()
-
 # Cas 2 : session déjà connue
 elif st.session_state.access_token and st.session_state.refresh_token:
     try:
