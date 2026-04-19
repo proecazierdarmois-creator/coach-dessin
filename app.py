@@ -1,5 +1,8 @@
 import streamlit as st
+import json
 from supabase import create_client, Client
+from google import genai
+from google.genai import types
 
 st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
 
@@ -9,8 +12,10 @@ st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
 DEFAULT_AVATAR = "https://via.placeholder.com/150?text=Avatar"
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ----------------------------
 # SESSION STATE INIT
@@ -71,6 +76,36 @@ def update_profile(email, age, genre, niveau_dessin):
         return True
 
     return False
+
+def analyze_drawing(image_bytes, mime_type, age, niveau_dessin):
+    """Analyse un dessin avec Gemini et renvoie un JSON"""
+    user_prompt = f"""
+Tu es un coach de dessin IA bienveillant et encourageant.
+
+Analyse ce dessin d'une personne de {age} ans, niveau {niveau_dessin}.
+
+Réponds uniquement en JSON avec cette structure :
+{{
+  "note": 1-10,
+  "points_forts": ["...", "..."],
+  "ameliorations": ["...", "..."],
+  "defi": "...",
+  "message_coach": "..."
+}}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[
+            user_prompt,
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+        ],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json"
+        ),
+    )
+
+    return json.loads(response.text)
 
 # ----------------------------
 # LOGIN GOOGLE
@@ -193,3 +228,49 @@ with st.expander("⚙️ Mon profil", expanded=False):
             st.rerun()
         else:
             st.error("❌ Erreur lors de la mise à jour")
+            st.write("")
+st.subheader("📸 Analyser ton dessin")
+
+uploaded_file = st.file_uploader(
+    "Choisis une image à analyser",
+    type=["jpg", "jpeg", "png"]
+)
+
+if uploaded_file is not None:
+    st.image(uploaded_file, width=300)
+
+    if st.button("🚀 Lancer l'analyse"):
+        with st.spinner("🤖 Analyse en cours..."):
+            try:
+                analysis = analyze_drawing(
+                    uploaded_file.getvalue(),
+                    uploaded_file.type,
+                    profile.get("age") or 10,
+                    profile.get("niveau_dessin") or "Débutant"
+                )
+
+                st.success("✅ Analyse complète !")
+
+                note = analysis.get("note", 0)
+                st.metric("⭐ Note", f"{note}/10")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.write("**💪 Points forts :**")
+                    for point in analysis.get("points_forts", []):
+                        st.write(f"• {point}")
+
+                with col2:
+                    st.write("**📈 À améliorer :**")
+                    for point in analysis.get("ameliorations", []):
+                        st.write(f"• {point}")
+
+                st.write("**🎯 Défi du jour :**")
+                st.info(analysis.get("defi", ""))
+
+                st.write("**💬 Message du coach :**")
+                st.success(analysis.get("message_coach", ""))
+
+            except Exception as e:
+                st.error(f"❌ Erreur : {str(e)}")
