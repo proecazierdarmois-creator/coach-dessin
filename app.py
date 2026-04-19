@@ -93,7 +93,8 @@ if profile:
     col1, col2 = st.columns([1, 3])
 
     with col1:
-        st.image(profile.get("avatar_url"), width=80)
+        avatar_url = profile.get("avatar_url") or DEFAULT_AVATAR
+        st.image(avatar_url, width=80)
 
     with col2:
         st.subheader(f"{st.user.name}")
