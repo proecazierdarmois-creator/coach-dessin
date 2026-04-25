@@ -27,6 +27,34 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def admin_get_user_analyses(email):
+    result = (
+        supabase.table("analyses")
+        .select("*")
+        .eq("email", email)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
+def admin_delete_analysis(analysis_id):
+    supabase.table("analyses").delete().eq("id", analysis_id).execute()
+
+def get_all_profiles():
+    result = supabase.table("profiles").select("*").order("xp", desc=True).execute()
+    return result.data or []
+
+
+def admin_update_profile(email, xp):
+    result = (
+        supabase.table("profiles")
+        .update({"xp": xp})
+        .eq("email", email)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
 def is_admin():
     if st.user.is_logged_in:
         return st.user.email in ADMIN_EMAILS
@@ -129,6 +157,60 @@ level = xp // 100
 st.write(f"🏆 Niveau {level}")
 st.progress((xp % 100) / 100)
 
+if is_admin():
+    st.write("---")
+
+    with st.expander("🛠️ Admin", expanded=False):
+        profiles = get_all_profiles()
+
+        if not profiles:
+            st.info("Aucun profil trouvé.")
+        else:
+            emails = [p["email"] for p in profiles]
+            selected_email = st.selectbox("Choisir un compte", emails)
+
+            selected_profile = next(
+                (p for p in profiles if p["email"] == selected_email),
+                None
+            )
+
+            if selected_profile:
+                st.write(f"**Compte :** {selected_profile['email']}")
+
+                new_xp = st.number_input(
+                    "XP",
+                    min_value=0,
+                    max_value=100000,
+                    value=selected_profile.get("xp") or 0,
+                    step=10
+                )
+
+                if st.button("💾 Modifier XP"):
+                    updated = admin_update_profile(selected_email, new_xp)
+
+                    if updated:
+                        st.success("XP mis à jour.")
+                        if st.session_state.profile.get("email") == selected_email:
+                            st.session_state.profile = updated
+                            st.write("---")
+st.write("### Analyses de cet utilisateur")
+
+user_analyses = admin_get_user_analyses(selected_email)
+
+if user_analyses:
+    for a in user_analyses[:10]:
+        with st.expander(f"Analyse {a.get('created_at', '')[:10]} — note {a.get('note', '—')}/10"):
+            if a.get("image_url"):
+                st.image(a["image_url"], width=250)
+
+            if st.button("🗑️ Supprimer cette analyse", key=f"del_analysis_{a['id']}"):
+                admin_delete_analysis(a["id"])
+                st.success("Analyse supprimée.")
+                st.rerun()
+else:
+    st.info("Aucune analyse pour ce compte.")
+    st.rerun()
+
 # ----------------------------
 # ANALYSE
 # ----------------------------
@@ -138,24 +220,40 @@ file = st.file_uploader("Upload dessin", type=["png", "jpg", "jpeg"])
 
 if file and st.button("Analyser"):
     with st.spinner("Analyse..."):
-        try:
-            data = analyze(file.getvalue(), file.type, 10, "Débutant")
-        except Exception as e:
-            st.error("Erreur lors de l'analyse")
-            st.code(str(e))
-            st.stop()
+        data = analyze(file.getvalue(), file.type, 10, "Débutant")
+
+        note = int(str(data.get("note", 0)).split("/")[0])
+        xp_gain = note * 5
+
+        xp = profile.get("xp", 0) + xp_gain
 
         save_analysis(st.user.email, "temp_url", data)
-
-        xp += data.get("note", 0) * 5
         update_xp(st.user.email, xp)
-
         st.session_state.profile["xp"] = xp
 
-        st.success("Analyse faite !")
+        st.success("✅ Analyse faite !")
         st.balloons()
 
-        st.json(data)
+        st.metric("⭐ Note", f"{note}/10")
+        st.metric("🔥 XP gagné", xp_gain)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.write("**💪 Points forts :**")
+            for p in data.get("points_forts", []):
+                st.write(f"• {p}")
+
+        with col2:
+            st.write("**📈 À améliorer :**")
+            for p in data.get("ameliorations", []):
+                st.write(f"• {p}")
+
+        st.write("**🎯 Défi :**")
+        st.info(data.get("defi", ""))
+
+        st.write("**💬 Coach :**")
+        st.success(data.get("message_coach", ""))
 
 # ----------------------------
 # HISTORIQUE
