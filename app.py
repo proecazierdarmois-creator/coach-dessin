@@ -53,16 +53,23 @@ def get_analyses(email):
     return res.data or []
 
 def save_analysis(email, image_url, analysis):
-    result = supabase.table("analyses").insert({
-        "email": email,
-        "image_url": image_url,
-        "note": analysis.get("note"),
-        "points_forts": analysis.get("points_forts", []),
-        "ameliorations": analysis.get("ameliorations", []),
-        "defi": analysis.get("defi", ""),
-        "message_coach": analysis.get("message_coach", ""),
-    }).execute()
-    return result.data[0] if result.data else None
+    try:
+        result = supabase.table("analyses").insert({
+            "email": email,
+            "image_url": image_url,
+            "note": analysis.get("note"),
+            "points_forts": analysis.get("points_forts", []),
+            "ameliorations": analysis.get("ameliorations", []),
+            "defi": analysis.get("defi", ""),
+            "message_coach": analysis.get("message_coach", ""),
+        }).execute()
+
+        return result.data[0] if result.data else None
+
+    except Exception as e:
+        st.error("Erreur sauvegarde Supabase")
+        st.code(str(e))
+        raise
 
 def analyze(image_bytes, mime, age, niveau):
     prompt = f"""
@@ -70,15 +77,24 @@ Analyse ce dessin d'une personne de {age} ans ({niveau}).
 Réponds en JSON avec :
 note, points_forts, ameliorations, defi, message_coach
 """
-    res = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[
-            prompt,
-            types.Part.from_bytes(data=image_bytes, mime_type=mime)
-        ],
-        config=types.GenerateContentConfig(response_mime_type="application/json")
-    )
-    return json.loads(res.text)
+
+    try:
+        res = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=image_bytes, mime_type=mime),
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            ),
+        )
+        return json.loads(res.text)
+
+    except Exception as e:
+        st.error("Erreur Gemini")
+        st.code(str(e))
+        raise
 
 # ----------------------------
 # LOGIN
@@ -122,7 +138,12 @@ file = st.file_uploader("Upload dessin", type=["png", "jpg", "jpeg"])
 
 if file and st.button("Analyser"):
     with st.spinner("Analyse..."):
-        data = analyze(file.getvalue(), file.type, 10, "Débutant")
+        try:
+            data = analyze(file.getvalue(), file.type, 10, "Débutant")
+        except Exception as e:
+            st.error("Erreur lors de l'analyse")
+            st.code(str(e))
+            st.stop()
 
         save_analysis(st.user.email, "temp_url", data)
 
