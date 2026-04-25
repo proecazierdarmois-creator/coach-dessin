@@ -57,7 +57,7 @@ def save_analysis(email, image_url, analysis):
         result = supabase.table("analyses").insert({
             "email": email,
             "image_url": image_url,
-            "note": analysis.get("note"),
+            "note": int(str(analysis.get("note", 0)).split("/")[0]),
             "points_forts": analysis.get("points_forts", []),
             "ameliorations": analysis.get("ameliorations", []),
             "defi": analysis.get("defi", ""),
