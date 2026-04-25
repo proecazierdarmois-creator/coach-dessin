@@ -1,5 +1,6 @@
 import streamlit as st
 import json
+import uuid
 from supabase import create_client
 from google import genai
 from google.genai import types
@@ -149,7 +150,6 @@ st.write(f"Bienvenue {st.user.name} 👋")
 if st.button("Déconnexion"):
     st.logout()
     st.session_state.profile = None
-    st.rerun()
 
 # XP
 xp = profile.get("xp", 0)
@@ -200,16 +200,18 @@ user_analyses = admin_get_user_analyses(selected_email)
 if user_analyses:
     for a in user_analyses[:10]:
         with st.expander(f"Analyse {a.get('created_at', '')[:10]} — note {a.get('note', '—')}/10"):
-            if a.get("image_url"):
-                st.image(a["image_url"], width=250)
+            image_url = a.get("image_url")
 
-            if st.button("🗑️ Supprimer cette analyse", key=f"del_analysis_{a['id']}"):
+if image_url and str(image_url).startswith("http"):
+    st.image(image_url, width=250)
+else:
+    st.caption("Image non disponible")
+
+if st.button("🗑️ Supprimer cette analyse", key=f"del_analysis_{a['id']}"):
                 admin_delete_analysis(a["id"])
                 st.success("Analyse supprimée.")
-                st.rerun()
 else:
     st.info("Aucune analyse pour ce compte.")
-    st.rerun()
 
 # ----------------------------
 # ANALYSE
@@ -227,33 +229,45 @@ if file and st.button("Analyser"):
 
         xp = profile.get("xp", 0) + xp_gain
 
-        save_analysis(st.user.email, "temp_url", data)
-        update_xp(st.user.email, xp)
-        st.session_state.profile["xp"] = xp
+    file_bytes = file.getvalue()
+    file_ext = file.name.split(".")[-1]
+    file_name = f"{st.user.email}/{uuid.uuid4()}.{file_ext}"
 
-        st.success("✅ Analyse faite !")
-        st.balloons()
+    supabase.storage.from_("drawings").upload(
+        file_name,
+        file_bytes,
+        {"content-type": file.type}
+    )
 
-        st.metric("⭐ Note", f"{note}/10")
-        st.metric("🔥 XP gagné", xp_gain)
+    image_url = supabase.storage.from_("drawings").get_public_url(file_name)
 
-        col1, col2 = st.columns(2)
+    save_analysis(st.user.email, image_url, data)
+    update_xp(st.user.email, xp)
+    st.session_state.profile["xp"] = xp
 
-        with col1:
-            st.write("**💪 Points forts :**")
-            for p in data.get("points_forts", []):
-                st.write(f"• {p}")
+    st.success("✅ Analyse faite !")
+    st.balloons()
 
-        with col2:
-            st.write("**📈 À améliorer :**")
-            for p in data.get("ameliorations", []):
-                st.write(f"• {p}")
+    st.metric("⭐ Note", f"{note}/10")
+    st.metric("🔥 XP gagné", xp_gain)
 
-        st.write("**🎯 Défi :**")
-        st.info(data.get("defi", ""))
+    col1, col2 = st.columns(2)
 
-        st.write("**💬 Coach :**")
-        st.success(data.get("message_coach", ""))
+    with col1:
+        st.write("**💪 Points forts :**")
+        for p in data.get("points_forts", []):
+            st.write(f"• {p}")
+
+    with col2:
+        st.write("**📈 À améliorer :**")
+        for p in data.get("ameliorations", []):
+            st.write(f"• {p}")
+
+    st.write("**🎯 Défi :**")
+    st.info(data.get("defi", ""))
+
+    st.write("**💬 Coach :**")
+    st.success(data.get("message_coach", ""))
 
 # ----------------------------
 # HISTORIQUE
