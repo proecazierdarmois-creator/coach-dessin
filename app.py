@@ -251,33 +251,37 @@ if xp_data:
 else:
     st.info("Pas de données XP")
     
+# ----------------------------
+# ADMIN 2
+# ----------------------------
+if is_admin():
+    st.write("---")
+
     with st.expander("🛠️ Admin", expanded=False):
-        profiles = get_all_profiles()
 
-if not profiles:
-    st.info("Aucun profil trouvé.")
-else:
-    emails = [str(p.get("email", "")) for p in profiles if p.get("email")]
+        profiles = get_all_profiles()  # 👈 IMPORTANT
 
-    search = st.text_input("🔍 Rechercher un utilisateur")
-    filtered_emails = [e for e in emails if search.lower() in e.lower()] if search else emails
+        if not profiles:
+            st.info("Aucun profil trouvé.")
+        else:
+            emails = [str(p.get("email", "")) for p in profiles if p.get("email")]
 
-    if not filtered_emails:
-        st.warning("Aucun utilisateur trouvé")
-    else:
-        selected_email = st.selectbox("Choisir un compte", filtered_emails)
+            search = st.text_input("🔍 Rechercher un utilisateur")
 
-        selected_profile = next(
-            (p for p in profiles if p.get("email") == selected_email),
-            None
-        )
+            filtered_emails = [e for e in emails if search.lower() in e.lower()] if search else emails
 
-        if selected_profile:
-            st.write(f"**Compte :** {selected_email}")
+            if not filtered_emails:
+                st.warning("Aucun utilisateur trouvé")
+            else:
+                selected_email = st.selectbox("Choisir un compte", filtered_emails)
 
-            # ✅ Tout ce qui utilise selected_email doit être ici
-            user_analyses = admin_get_user_analyses(selected_email)
-            st.write(f"Analyses : {len(user_analyses)}")
+                selected_profile = next(
+                    (p for p in profiles if p.get("email") == selected_email),
+                    None
+                )
+
+                if selected_profile:
+                    st.write(f"Compte : {selected_email}")
 
             new_xp = st.number_input(
                     "XP",
