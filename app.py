@@ -28,6 +28,16 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def get_daily_challenge(level):
+    if level < 2:
+        return "Dessine un objet simple avec une ombre."
+    elif level < 5:
+        return "Dessine un visage avec 3 expressions différentes."
+    elif level < 10:
+        return "Dessine une scène avec arrière-plan et perspective."
+    else:
+        return "Crée une composition complète avec lumière, perspective et détails."
+
 def get_badges(xp, analyses_count):
     badges = []
 
@@ -160,10 +170,31 @@ def save_analysis(email, image_url, analysis):
         st.code(str(e))
         raise
 
-def analyze(image_bytes, mime, age, niveau):
+def get_coach_style(level):
+    if level < 2:
+        return "Utilise un langage très simple, très encourageant, adapté à un débutant."
+    elif level < 5:
+        return "Donne des conseils concrets sur les formes, proportions et couleurs."
+    elif level < 10:
+        return "Sois plus précis sur composition, volumes, ombres et perspective."
+    else:
+        return "Donne un retour avancé comme un professeur de dessin."
+
+def analyze(image_bytes, mime, age, niveau, level):
+    coach_style = get_coach_style(level)
+
     prompt = f"""
-Analyse ce dessin d'une personne de {age} ans ({niveau}).
-Réponds en JSON avec :
+Tu es un coach de dessin IA bienveillant.
+
+Profil :
+- âge : {age}
+- niveau déclaré : {niveau}
+- niveau XP : {level}
+
+Style de coaching :
+{coach_style}
+
+Réponds uniquement en JSON avec :
 note, points_forts, ameliorations, defi, message_coach
 """
 
@@ -232,6 +263,9 @@ st.write(f"🏆 Niveau {level}")
 st.progress(xp_in_level / 100)
 st.subheader(rank)
 st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
+
+with st.expander("🎯 Défi du jour", expanded=True):
+    st.info(get_daily_challenge(level))
 
 if is_admin():
     st.write("---")
@@ -352,31 +386,48 @@ file = st.file_uploader("Upload dessin", type=["png", "jpg", "jpeg"])
 
 if file and st.button("Analyser"):
     with st.spinner("Analyse..."):
-        data = analyze(file.getvalue(), file.type, 10, "Débutant")
 
+        xp = profile.get("xp", 0)
+        level = xp // 100
+
+        # 👉 APPEL ICI
+        data = analyze(
+            file.getvalue(),
+            file.type,
+            profile.get("age") or 10,
+            profile.get("niveau_dessin") or "Débutant",
+            level
+        )
+
+        # 👉 récupération note
         note = int(str(data.get("note", 0)).split("/")[0])
         xp_gain = note * 5
+        xp += xp_gain
 
-        xp = profile.get("xp", 0) + xp_gain
+        # 👉 upload image
+        import uuid
+        file_bytes = file.getvalue()
+        file_ext = file.name.split(".")[-1]
+        file_name = f"{st.user.email}/{uuid.uuid4()}.{file_ext}"
 
-    file_bytes = file.getvalue()
-    file_ext = file.name.split(".")[-1]
-    file_name = f"{st.user.email}/{uuid.uuid4()}.{file_ext}"
+        supabase.storage.from_("drawings").upload(
+            file_name,
+            file_bytes,
+            {"content-type": file.type}
+        )
 
-    supabase.storage.from_("drawings").upload(
-        file_name,
-        file_bytes,
-        {"content-type": file.type}
-    )
+        image_url = supabase.storage.from_("drawings").get_public_url(file_name)
 
-    image_url = supabase.storage.from_("drawings").get_public_url(file_name)
+        # 👉 sauvegarde
+        save_analysis(st.user.email, image_url, data)
 
-    save_analysis(st.user.email, image_url, data)
-    update_xp(st.user.email, xp)
-    st.session_state.profile["xp"] = xp
+        # 👉 update XP
+        update_xp(st.user.email, xp)
+        st.session_state.profile["xp"] = xp
 
-    st.success("✅ Analyse faite !")
-    st.balloons()
+        # 👉 affichage
+        st.snow("✅ Analyse faite !")
+        st.balloons()
 
     st.metric("⭐ Note", f"{note}/10")
     st.metric("🔥 XP gagné", xp_gain)
