@@ -28,6 +28,29 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def get_level_info(xp):
+    level = xp // 100
+    xp_in_level = xp % 100
+
+    if level < 2:
+        rank = "🌱 Débutant"
+    elif level < 5:
+        rank = "✏️ Apprenti"
+    elif level < 10:
+        rank = "🎨 Artiste"
+    else:
+        rank = "👑 Maître"
+
+    return level, xp_in_level, rank
+
+def admin_get_xp_data():
+    profiles = supabase.table("profiles").select("email, xp").execute().data or []
+
+    # tri par XP
+    profiles = sorted(profiles, key=lambda x: x.get("xp", 0), reverse=True)
+
+    return profiles[:10]  # top 10
+
 def admin_get_stats():
     profiles = supabase.table("profiles").select("*").execute().data or []
     analyses = supabase.table("analyses").select("*").execute().data or []
@@ -170,13 +193,32 @@ if st.button("Déconnexion"):
 
 # XP
 xp = profile.get("xp", 0)
-level = xp // 100
+
+level, xp_in_level, rank = get_level_info(xp)
+
 st.write(f"🏆 Niveau {level}")
-st.progress((xp % 100) / 100)
+st.progress(xp_in_level / 100)
+st.subheader(rank)
+st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
 
 if is_admin():
     st.write("---")
 
+    st.write("")
+st.write("### 📈 Graphique XP")
+
+xp_data = admin_get_xp_data()
+
+if xp_data:
+    names = [p["email"] for p in xp_data]
+    values = [p.get("xp", 0) for p in xp_data]
+
+    st.bar_chart({
+        "XP": values
+    })
+else:
+    st.info("Pas de données XP")
+    
     with st.expander("🛠️ Admin", expanded=False):
         profiles = get_all_profiles()
 
