@@ -184,7 +184,14 @@ if is_admin():
             st.info("Aucun profil trouvé.")
         else:
             emails = [p["email"] for p in profiles]
-            selected_email = st.selectbox("Choisir un compte", emails)
+            search = st.text_input("🔍 Rechercher un utilisateur (email)")
+
+            filtered_emails = [
+            e for e in emails if search.lower() in e.lower()
+            ] if search else emails
+
+            selected_email = st.selectbox("Choisir un compte",filtered_emails)
+            st.caption(f"{len(filtered_emails)} utilisateur(s) trouvé(s)")
 
             selected_profile = next(
                 (p for p in profiles if p["email"] == selected_email),
@@ -237,7 +244,7 @@ st.write("### 🏆 Top utilisateurs")
 total_users, total_analyses, avg_xp, top_users = admin_get_stats()
 for i, user in enumerate(top_users):
     st.write(f"{i+1}. {user.get('email')} — {user.get('xp',0)} XP")
-    
+
 st.write("---")
 st.write("### 📊 Statistiques")
 
