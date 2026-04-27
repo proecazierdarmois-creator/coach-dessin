@@ -4,6 +4,7 @@ import uuid
 from supabase import create_client
 from google import genai
 from google.genai import types
+from datetime import date, timedelta
 
 st.set_page_config(page_title="Coach de dessin IA", page_icon="🎨")
 
@@ -28,6 +29,39 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def update_streak(email):
+    today = date.today()
+
+    profile = get_profile(email)
+    last_active = profile.get("last_active_date")
+    streak = profile.get("streak", 0) or 0
+
+    if last_active:
+        last_active = date.fromisoformat(str(last_active))
+
+    if last_active == today:
+        return streak
+
+    if last_active == today - timedelta(days=1):
+        streak += 1
+    else:
+        streak = 1
+
+    result = (
+        supabase.table("profiles")
+        .update({
+            "streak": streak,
+            "last_active_date": str(today),
+        })
+        .eq("email", email)
+        .execute()
+    )
+
+    if result.data:
+        st.session_state.profile = result.data[0]
+
+    return streak
+
 def get_leaderboard():
     profiles = supabase.table("profiles").select("email, xp").execute().data or []
 
@@ -244,6 +278,8 @@ if st.session_state.profile is None:
     st.session_state.profile = ensure_profile(st.user.email)
 
 profile = st.session_state.profile
+streak = update_streak(st.user.email)
+profile = st.session_state.profile
 
 # ----------------------------
 # DASHBOARD
@@ -254,6 +290,23 @@ st.write(f"Bienvenue {st.user.name} 👋")
 if st.button("Déconnexion"):
     st.logout()
     st.session_state.profile = None
+
+xp = profile.get("xp", 0)
+streak = profile.get("streak", 0)
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("⭐ XP", xp)
+
+with col2:
+    st.metric("🏆 Niveau", xp // 100)
+
+with col3:
+    st.metric("🔥 Streak", f"{streak} jour(s)")
+
+if streak >= 3:
+    st.success("🔥 Tu es en série ! Continue comme ça !")
 
 # XP
 xp = profile.get("xp", 0)
