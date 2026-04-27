@@ -469,70 +469,92 @@ with c3:
 st.subheader("📸 Analyse")
 
 file = st.file_uploader("Upload dessin", type=["png", "jpg", "jpeg"])
-
 is_challenge = st.checkbox("🎯 Ce dessin répond au défi du jour")
+
 if file and st.button("Analyser"):
     with st.spinner("Analyse..."):
-
-        xp = profile.get("xp", 0)
-        level = xp // 100
-
-        # 👉 APPEL ICI
-        data = analyze(
-            file.getvalue(),
-            file.type,
-            profile.get("age") or 10,
-            profile.get("niveau_dessin") or "Débutant",
-            level
-        )
-
-        # 👉 récupération note
-        raw_note = data.get("note", 0)
-
-try:
-    if isinstance(raw_note, int):
-        note = raw_note
-    else:
-        note = int(str(raw_note).split("/")[0].strip())
-except:
-        note = 0
-        xp_gain = note * 5
-        xp += xp_gain
-
-        # 👉 upload image
-        import uuid
-        file_bytes = file.getvalue()
-        file_ext = file.name.split(".")[-1]
-        file_name = f"{st.user.email}/{uuid.uuid4()}.{file_ext}"
-
-        supabase.storage.from_("drawings").upload(
-            file_name,
-            file_bytes,
-            {"content-type": file.type}
-        )
-
-        image_url = supabase.storage.from_("drawings").get_public_url(file_name)
-
-        # 👉 sauvegarde
         try:
-            save_analysis(st.user.email, image_url, data)
+            xp = profile.get("xp", 0)
+            level = xp // 100
+            file_bytes = file.getvalue()
+
+            data = analyze(
+                file_bytes,
+                file.type,
+                profile.get("age") or 10,
+                profile.get("niveau_dessin") or "Débutant",
+                level
+            )
+
+            raw_note = data.get("note", 0)
+            try:
+                if isinstance(raw_note, int):
+                    note = raw_note
+                else:
+                    note = int(str(raw_note).split("/")[0].strip())
+            except Exception:
+                note = 0
+
+            xp_gain = note * 5
+
+            if is_challenge:
+                xp_gain += 25
+
+            new_xp = xp + xp_gain
+
+            import uuid
+            file_ext = file.name.split(".")[-1]
+            file_name = f"{st.user.email}/{uuid.uuid4()}.{file_ext}"
+
+            supabase.storage.from_("drawings").upload(
+                file_name,
+                file_bytes,
+                {"content-type": file.type}
+            )
+
+            image_url = supabase.storage.from_("drawings").get_public_url(file_name)
+
+            save_analysis(st.user.email, image_url, data, is_challenge)
+
+            update_xp(st.user.email, new_xp)
+            st.session_state.profile["xp"] = new_xp
+            profile["xp"] = new_xp
+
+            st.toast("✅ Analyse faite !")
+            st.balloons()
+
+            st.metric("⭐ Note", f"{note}/10")
+            st.metric("🔥 XP gagné", xp_gain)
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.write("**💪 Points forts :**")
+                for p in data.get("points_forts", []):
+                    st.write(f"• {p}")
+
+            with col2:
+                st.write("**📈 À améliorer :**")
+                for p in data.get("ameliorations", []):
+                    st.write(f"• {p}")
+
+            st.write("**🎯 Défi :**")
+            st.info(data.get("defi", ""))
+
+            st.write("**💬 Coach :**")
+            st.success(data.get("message_coach", ""))
+
         except Exception as e:
-            st.error("Erreur sauvegarde Supabase")
+            st.error("Erreur pendant l'analyse")
             st.code(str(e))
-            st.stop()
 
-        # 👉 update XP
-        update_xp(st.user.email, xp)
-        st.session_state.profile["xp"] = xp
+# ----------------------------
+# GALERIE
+# ----------------------------
+with st.expander("🖼️ Galerie de tes dessins", expanded=False):
+    analyses = get_analyses(st.user.email)
 
-        # 👉 affichage
-        st.toast("✅ Analyse faite !")
-        st.balloons()
-
-        with st.expander("🖼️ Galerie de tes dessins", expanded=False):
-                analyses = get_analyses(st.user.email)
-
-if analyses:
+    if analyses:
         cols = st.columns(3)
 
         for i, a in enumerate(analyses[:12]):
@@ -546,7 +568,6 @@ if analyses:
 
                 note = a.get("note", "—")
                 st.markdown(f"⭐ **{note}/10**")
-                st.metric("🔥 XP gagné", xp_gain)
 
                 if a.get("is_challenge"):
                     st.caption("🎯 Défi validé")
@@ -567,8 +588,8 @@ if analyses:
 
                     if a.get("message_coach"):
                         st.success(a.get("message_coach"))
-        else:
-            st.info("Aucun dessin pour le moment.")
+    else:
+        st.info("Aucun dessin pour le moment.")
 
 # ----------------------------
 # HISTORIQUE
