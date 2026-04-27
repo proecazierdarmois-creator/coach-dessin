@@ -28,6 +28,26 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def get_badges(xp, analyses_count):
+    badges = []
+
+    if xp >= 50:
+        badges.append("🎯 Premier pas")
+
+    if xp >= 200:
+        badges.append("🔥 Motivé")
+
+    if xp >= 500:
+        badges.append("🚀 Pro du dessin")
+
+    if analyses_count >= 5:
+        badges.append("📸 5 dessins")
+
+    if analyses_count >= 20:
+        badges.append("🏅 20 dessins")
+
+    return badges
+
 def get_level_info(xp):
     level = xp // 100
     xp_in_level = xp % 100
@@ -194,6 +214,18 @@ if st.button("Déconnexion"):
 # XP
 xp = profile.get("xp", 0)
 
+#Badges
+analyses = get_analyses(st.user.email)
+badges = get_badges(xp, len(analyses))
+
+st.write("### 🏅 Tes badges")
+
+if badges:
+    for b in badges:
+        st.write(b)
+else:
+    st.caption("Aucun badge débloqué pour le moment")
+
 level, xp_in_level, rank = get_level_info(xp)
 
 st.write(f"🏆 Niveau {level}")
@@ -222,28 +254,32 @@ else:
     with st.expander("🛠️ Admin", expanded=False):
         profiles = get_all_profiles()
 
-        if not profiles:
-            st.info("Aucun profil trouvé.")
-        else:
-            emails = [p["email"] for p in profiles]
-            search = st.text_input("🔍 Rechercher un utilisateur (email)")
+if not profiles:
+    st.info("Aucun profil trouvé.")
+else:
+    emails = [str(p.get("email", "")) for p in profiles if p.get("email")]
 
-            filtered_emails = [
-            e for e in emails if search.lower() in e.lower()
-            ] if search else emails
+    search = st.text_input("🔍 Rechercher un utilisateur")
+    filtered_emails = [e for e in emails if search.lower() in e.lower()] if search else emails
 
-            selected_email = st.selectbox("Choisir un compte",filtered_emails)
-            st.caption(f"{len(filtered_emails)} utilisateur(s) trouvé(s)")
+    if not filtered_emails:
+        st.warning("Aucun utilisateur trouvé")
+    else:
+        selected_email = st.selectbox("Choisir un compte", filtered_emails)
 
-            selected_profile = next(
-                (p for p in profiles if p["email"] == selected_email),
-                None
-            )
+        selected_profile = next(
+            (p for p in profiles if p.get("email") == selected_email),
+            None
+        )
 
-            if selected_profile:
-                st.write(f"**Compte :** {selected_profile['email']}")
+        if selected_profile:
+            st.write(f"**Compte :** {selected_email}")
 
-                new_xp = st.number_input(
+            # ✅ Tout ce qui utilise selected_email doit être ici
+            user_analyses = admin_get_user_analyses(selected_email)
+            st.write(f"Analyses : {len(user_analyses)}")
+
+            new_xp = st.number_input(
                     "XP",
                     min_value=0,
                     max_value=100000,
@@ -251,7 +287,7 @@ else:
                     step=10
                 )
 
-                if st.button("💾 Modifier XP"):
+        if st.button("💾 Modifier XP"):
                     updated = admin_update_profile(selected_email, new_xp)
 
                     if updated:
