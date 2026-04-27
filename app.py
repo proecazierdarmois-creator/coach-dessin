@@ -28,6 +28,23 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def admin_get_stats():
+    profiles = supabase.table("profiles").select("*").execute().data or []
+    analyses = supabase.table("analyses").select("*").execute().data or []
+
+    total_users = len(profiles)
+    total_analyses = len(analyses)
+
+    avg_xp = int(sum([p.get("xp", 0) for p in profiles]) / total_users) if total_users > 0 else 0
+
+    top_users = sorted(
+        profiles,
+        key=lambda p: p.get("xp", 0) or 0,
+        reverse=True
+    )[:5]
+
+    return total_users, total_analyses, avg_xp, top_users
+
 def admin_get_user_analyses(email):
     result = (
         supabase.table("analyses")
@@ -214,6 +231,28 @@ if user_analyses:
                 st.rerun()
 else:
     st.info("Aucune analyse pour ce compte.")
+
+st.write("")
+st.write("### 🏆 Top utilisateurs")
+total_users, total_analyses, avg_xp, top_users = admin_get_stats()
+for i, user in enumerate(top_users):
+    st.write(f"{i+1}. {user.get('email')} — {user.get('xp',0)} XP")
+    
+st.write("---")
+st.write("### 📊 Statistiques")
+
+total_users, total_analyses, avg_xp, top_users = admin_get_stats()
+
+c1, c2, c3 = st.columns(3)
+
+with c1:
+    st.metric("👥 Utilisateurs", total_users)
+
+with c2:
+    st.metric("🖼️ Analyses", total_analyses)
+
+with c3:
+    st.metric("📊 XP moyen", avg_xp)
 
 # ----------------------------
 # ANALYSE
