@@ -161,24 +161,18 @@ def get_analyses(email):
     res = supabase.table("analyses").select("*").eq("email", email).execute()
     return res.data or []
 
-def save_analysis(email, image_url, analysis):
-    try:
-        result = supabase.table("analyses").insert({
-            "email": email,
-            "image_url": image_url,
-            "note": int(str(analysis.get("note", 0)).split("/")[0]),
-            "points_forts": analysis.get("points_forts", []),
-            "ameliorations": analysis.get("ameliorations", []),
-            "defi": analysis.get("defi", ""),
-            "message_coach": analysis.get("message_coach", ""),
-        }).execute()
-
-        return result.data[0] if result.data else None
-
-    except Exception as e:
-        st.error("Erreur sauvegarde Supabase")
-        st.code(str(e))
-        raise
+def save_analysis(email, image_url, analysis, is_challenge=False):
+    result = supabase.table("analyses").insert({
+        "email": email,
+        "image_url": image_url,
+        "note": int(str(analysis.get("note", 0)).split("/")[0]),
+        "points_forts": analysis.get("points_forts", []),
+        "ameliorations": analysis.get("ameliorations", []),
+        "defi": analysis.get("defi", ""),
+        "message_coach": analysis.get("message_coach", ""),
+        "is_challenge": is_challenge,
+    }).execute()
+    return result.data[0] if result.data else None
 
 def get_coach_style(level):
     if level < 2:
@@ -231,7 +225,8 @@ note, points_forts, ameliorations, defi, message_coach
 # ----------------------------
 if not st.user.is_logged_in:
     st.title("🎨 Coach de dessin IA")
-    st.button("🔵 Se connecter avec Google", on_click=st.login)
+    st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
+    st.button(" Se connecter avec Microsoft", on_click=lambda: st.login("microsoft"))
     st.stop()
 
 # ----------------------------
@@ -394,6 +389,7 @@ st.subheader("📸 Analyse")
 
 file = st.file_uploader("Upload dessin", type=["png", "jpg", "jpeg"])
 
+is_challenge = st.checkbox("🎯 Ce dessin répond au défi du jour")
 if file and st.button("Analyser"):
     with st.spinner("Analyse..."):
 
@@ -437,7 +433,12 @@ except:
         image_url = supabase.storage.from_("drawings").get_public_url(file_name)
 
         # 👉 sauvegarde
-        save_analysis(st.user.email, image_url, data)
+        try:
+            save_analysis(st.user.email, image_url, data)
+        except Exception as e:
+            st.error("Erreur sauvegarde Supabase")
+            st.code(str(e))
+            st.stop()
 
         # 👉 update XP
         update_xp(st.user.email, xp)
@@ -447,26 +448,46 @@ except:
         st.toast("✅ Analyse faite !")
         st.balloons()
 
-        st.metric("⭐ Note", f"{note}/10")
-        st.metric("🔥 XP gagné", xp_gain)
+        with st.expander("🖼️ Galerie de tes dessins", expanded=False):
+                analyses = get_analyses(st.user.email)
 
-        col1, col2 = st.columns(2)
+if analyses:
+        cols = st.columns(3)
 
-with col1:
-        st.write("**💪 Points forts :**")
-        for p in data.get("points_forts", []):
-            st.write(f"• {p}")
+        for i, a in enumerate(analyses[:12]):
+            with cols[i % 3]:
+                image_url = a.get("image_url")
 
-with col2:
-        st.write("**📈 À améliorer :**")
-        for p in data.get("ameliorations", []):
-            st.write(f"• {p}")
+                if image_url and str(image_url).startswith("http"):
+                    st.image(image_url, use_container_width=True)
+                else:
+                    st.caption("Image non disponible")
 
-        st.write("**🎯 Défi :**")
-        st.info(data.get("defi", ""))
+                note = a.get("note", "—")
+                st.markdown(f"⭐ **{note}/10**")
+                st.metric("🔥 XP gagné", xp_gain)
 
-        st.write("**💬 Coach :**")
-        st.success(data.get("message_coach", ""))
+                if a.get("is_challenge"):
+                    st.caption("🎯 Défi validé")
+
+                with st.expander("Détails"):
+                    if a.get("points_forts"):
+                        st.write("**💪 Points forts**")
+                        for p in a.get("points_forts"):
+                            st.write(f"• {p}")
+
+                    if a.get("ameliorations"):
+                        st.write("**📈 À améliorer**")
+                        for p in a.get("ameliorations"):
+                            st.write(f"• {p}")
+
+                    if a.get("defi"):
+                        st.info(a.get("defi"))
+
+                    if a.get("message_coach"):
+                        st.success(a.get("message_coach"))
+        else:
+            st.info("Aucun dessin pour le moment.")
 
 # ----------------------------
 # HISTORIQUE
