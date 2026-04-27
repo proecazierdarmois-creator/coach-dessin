@@ -28,6 +28,15 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def get_leaderboard():
+    profiles = supabase.table("profiles").select("email, xp").execute().data or []
+
+    return sorted(
+        profiles,
+        key=lambda x: x.get("xp", 0),
+        reverse=True
+    )[:10]
+
 def get_daily_challenge(level):
     if level < 2:
         return "Dessine un objet simple avec une ombre."
@@ -226,7 +235,6 @@ note, points_forts, ameliorations, defi, message_coach
 if not st.user.is_logged_in:
     st.title("🎨 Coach de dessin IA")
     st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
-    st.button(" Se connecter avec Microsoft", on_click=lambda: st.login("microsoft"))
     st.stop()
 
 # ----------------------------
@@ -271,6 +279,26 @@ st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
 
 with st.expander("🎯 Défi du jour", expanded=True):
     st.info(get_daily_challenge(level))
+
+with st.expander("🏆 Classement global", expanded=True):
+
+    leaderboard = get_leaderboard()
+    medals = ["🥇", "🥈", "🥉"]
+
+    current_email = st.user.email  # 👈 ICI
+
+    for i, user in enumerate(leaderboard):
+        medal = medals[i] if i < 3 else f"{i+1}."
+
+        if user.get("email") == current_email:
+            st.success(f"{medal} {user.get('email')} — {user.get('xp',0)} XP (toi)")
+        else:
+            st.write(f"{medal} {user.get('email')} — {user.get('xp',0)} XP")
+
+    for i, user in enumerate(leaderboard):
+        medal = medals[i] if i < 3 else f"{i+1}."
+
+        st.write(f"{medal} {user.get('email')} — {user.get('xp',0)} XP")
 
 if is_admin():
     st.write("---")
