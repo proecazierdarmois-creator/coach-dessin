@@ -200,12 +200,13 @@ user_analyses = admin_get_user_analyses(selected_email)
 if user_analyses:
     for a in user_analyses[:10]:
         with st.expander(f"Analyse {a.get('created_at', '')[:10]} — note {a.get('note', '—')}/10"):
+
             image_url = a.get("image_url")
 
-if image_url and str(image_url).startswith("http"):
-    st.image(image_url, width=250)
-else:
-    st.caption("Image non disponible")
+            if image_url and str(image_url).startswith("http"):
+                st.image(image_url, width=250)
+            else:
+                st.caption("Image non disponible")
 
 if st.button("🗑️ Supprimer cette analyse", key=f"del_analysis_{a['id']}"):
                 admin_delete_analysis(a["id"])
