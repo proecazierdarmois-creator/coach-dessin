@@ -37,6 +37,16 @@ def get_daily_challenge(level):
         return "Dessine une scène avec arrière-plan et perspective."
     else:
         return "Crée une composition complète avec lumière, perspective et détails."
+    
+def get_coach_style(level):
+    if level < 2:
+        return "Utilise un langage très simple et très encourageant."
+    elif level < 5:
+        return "Donne des conseils concrets sur formes, proportions et couleurs."
+    elif level < 10:
+        return "Sois plus précis sur composition, volumes, ombres et perspective."
+    else:
+        return "Donne un retour avancé comme un professeur de dessin."
 
 def get_badges(xp, analyses_count):
     badges = []
@@ -194,7 +204,7 @@ Profil :
 Style de coaching :
 {coach_style}
 
-Réponds uniquement en JSON avec :
+Réponds en JSON avec :
 note, points_forts, ameliorations, defi, message_coach
 """
 
@@ -400,7 +410,15 @@ if file and st.button("Analyser"):
         )
 
         # 👉 récupération note
-        note = int(str(data.get("note", 0)).split("/")[0])
+        raw_note = data.get("note", 0)
+
+try:
+    if isinstance(raw_note, int):
+        note = raw_note
+    else:
+        note = int(str(raw_note).split("/")[0].strip())
+except:
+        note = 0
         xp_gain = note * 5
         xp += xp_gain
 
@@ -429,26 +447,26 @@ if file and st.button("Analyser"):
         st.toast("✅ Analyse faite !")
         st.balloons()
 
-    st.metric("⭐ Note", f"{note}/10")
-    st.metric("🔥 XP gagné", xp_gain)
+        st.metric("⭐ Note", f"{note}/10")
+        st.metric("🔥 XP gagné", xp_gain)
 
-    col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
-    with col1:
+with col1:
         st.write("**💪 Points forts :**")
         for p in data.get("points_forts", []):
             st.write(f"• {p}")
 
-    with col2:
+with col2:
         st.write("**📈 À améliorer :**")
         for p in data.get("ameliorations", []):
             st.write(f"• {p}")
 
-    st.write("**🎯 Défi :**")
-    st.info(data.get("defi", ""))
+        st.write("**🎯 Défi :**")
+        st.info(data.get("defi", ""))
 
-    st.write("**💬 Coach :**")
-    st.success(data.get("message_coach", ""))
+        st.write("**💬 Coach :**")
+        st.success(data.get("message_coach", ""))
 
 # ----------------------------
 # HISTORIQUE
