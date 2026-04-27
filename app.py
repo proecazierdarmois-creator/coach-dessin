@@ -426,7 +426,7 @@ if file and st.button("Analyser"):
         st.session_state.profile["xp"] = xp
 
         # 👉 affichage
-        st.snow("✅ Analyse faite !")
+        st.toast("✅ Analyse faite !")
         st.balloons()
 
     st.metric("⭐ Note", f"{note}/10")
