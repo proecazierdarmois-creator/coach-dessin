@@ -208,9 +208,10 @@ if user_analyses:
             else:
                 st.caption("Image non disponible")
 
-if st.button("🗑️ Supprimer cette analyse", key=f"del_analysis_{a['id']}"):
+            if st.button("🗑️ Supprimer cette analyse", key=f"del_analysis_{a['id']}"):
                 admin_delete_analysis(a["id"])
                 st.success("Analyse supprimée.")
+                st.rerun()
 else:
     st.info("Aucune analyse pour ce compte.")
 
