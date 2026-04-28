@@ -32,7 +32,7 @@ La note doit être un entier entre 1 et 10.
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=[
                 prompt,
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
