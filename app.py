@@ -22,9 +22,16 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 if "code" in st.query_params:
     try:
-        supabase.auth.exchange_code_for_session(st.query_params["code"])
+        code = st.query_params.get("code")
+
+        if isinstance(code, list):
+            code = code[0]
+
+        supabase.auth.exchange_code_for_session(code)
+
         st.query_params.clear()
         st.rerun()
+
     except Exception as e:
         st.error("Erreur retour OAuth")
         st.code(str(e))
