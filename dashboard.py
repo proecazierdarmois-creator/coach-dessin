@@ -66,6 +66,8 @@ def show_dashboard(profile, email):
 
             if analysis is None:
                 return
+            
+            st.write("DEBUG analysis:", analysis)
 
             saved = save_analysis(email, image_url, analysis)
             note = saved.get("note", 0) if saved else 0
