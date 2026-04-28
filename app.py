@@ -420,6 +420,13 @@ if submitted:
         st.code(str(e))
 
 st.stop()
+
+if st.user.is_logged_in and hasattr(st.user, "email"):
+    current_email = st.user.email
+
+    if st.session_state.profile is None:
+        st.session_state.profile = ensure_profile(current_email)
+        st.rerun()
 # ----------------------------
 # LOAD PROFILE
 # ----------------------------
