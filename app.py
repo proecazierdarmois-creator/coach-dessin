@@ -29,6 +29,17 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def get_current_email():
+    # Cas Google via Streamlit
+    if st.user.is_logged_in and hasattr(st.user, "email"):
+        return st.current_email
+
+    # Cas autres providers si profile déjà chargé
+    if st.session_state.profile:
+        return st.session_state.profile.get("email")
+
+    return None
+
 def is_parent():
     profile = st.session_state.profile
     return profile and profile.get("role") == "parent"
@@ -225,7 +236,7 @@ def admin_update_profile(email, xp):
 
 def is_admin():
     if st.user.is_logged_in:
-        return st.user.email in ADMIN_EMAILS
+        return st.current_email in ADMIN_EMAILS
     if st.session_state.profile:
         return st.session_state.profile.get("email") in ADMIN_EMAILS
     return False
@@ -354,16 +365,29 @@ if st.button("🎵 Se connecter avec Spotify"):
 # LOAD PROFILE
 # ----------------------------
 if st.session_state.profile is None:
-    st.session_state.profile = ensure_profile(st.user.email)
+    if st.user.is_logged_in and hasattr(st.user, "email"):
+       current_email = get_current_email()
+
+if current_email and st.session_state.profile is None:
+    st.session_state.profile = ensure_profile(current_email)
+else:
+    st.warning("Connecte-toi avec Google pour charger le profil Streamlit.")
+    st.stop()
 
 profile = st.session_state.profile
-streak = update_streak(st.user.email)
+streak = update_streak(st.current_email)
 profile = st.session_state.profile
 
 # ----------------------------
 # DASHBOARD
 # ----------------------------
 st.title("🎨 Coach de dessin IA")
+current_email = get_current_email()
+
+if not current_email:
+    st.warning("Connecte-toi pour continuer.")
+    st.stop()
+
 st.write(f"Bienvenue {st.user.name} 👋")
 
 if st.button("Déconnexion"):
@@ -392,7 +416,7 @@ with st.expander("👨‍👩‍👧 Mode parent", expanded=False):
     if not is_parent():
         st.write("Active le mode parent pour suivre un enfant.")
         if st.button("Activer le mode parent"):
-            if set_parent_role(st.user.email):
+            if set_parent_role(st.current_email):
                 st.success("Mode parent activé.")
                 st.rerun()
     else:
@@ -401,14 +425,14 @@ with st.expander("👨‍👩‍👧 Mode parent", expanded=False):
         child_email = st.text_input("Email de l'enfant à suivre")
 
         if st.button("Associer cet enfant"):
-            linked = parent_link_child(child_email, st.user.email)
+            linked = parent_link_child(child_email, st.current_email)
             if linked:
                 st.success("Enfant associé.")
                 st.rerun()
             else:
                 st.error("Aucun profil enfant trouvé avec cet email.")
 
-        children = get_children_for_parent(st.user.email)
+        children = get_children_for_parent(st.current_email)
 
         st.write("### Enfants associés")
 
@@ -433,7 +457,7 @@ with st.expander("👨‍👩‍👧 Mode parent", expanded=False):
 xp = profile.get("xp", 0)
 
 #Badges
-analyses = get_analyses(st.user.email)
+analyses = get_analyses(st.current_email)
 badges = get_badges(xp, len(analyses))
 
 st.write("### 🏅 Tes badges")
@@ -459,7 +483,7 @@ with st.expander("🏆 Classement global", expanded=True):
     leaderboard = get_leaderboard()
     medals = ["🥇", "🥈", "🥉"]
 
-    current_email = st.user.email  # 👈 ICI
+    current_email = st.current_email  # 👈 ICI
 
     for i, user in enumerate(leaderboard):
         medal = medals[i] if i < 3 else f"{i+1}."
@@ -638,7 +662,7 @@ if file and st.button("Analyser"):
 
             import uuid
             file_ext = file.name.split(".")[-1]
-            file_name = f"{st.user.email}/{uuid.uuid4()}.{file_ext}"
+            file_name = f"{st.current_email}/{uuid.uuid4()}.{file_ext}"
 
             supabase.storage.from_("drawings").upload(
                 file_name,
@@ -648,9 +672,9 @@ if file and st.button("Analyser"):
 
             image_url = supabase.storage.from_("drawings").get_public_url(file_name)
 
-            save_analysis(st.user.email, image_url, data, is_challenge)
+            save_analysis(st.current_email, image_url, data, is_challenge)
 
-            update_xp(st.user.email, new_xp)
+            update_xp(st.current_email, new_xp)
             st.session_state.profile["xp"] = new_xp
             profile["xp"] = new_xp
 
@@ -686,7 +710,7 @@ if file and st.button("Analyser"):
 # GALERIE
 # ----------------------------
 with st.expander("🖼️ Galerie de tes dessins", expanded=False):
-    analyses = get_analyses(st.user.email)
+    analyses = get_analyses(st.current_email)
 
     if analyses:
         cols = st.columns(3)
@@ -729,7 +753,7 @@ with st.expander("🖼️ Galerie de tes dessins", expanded=False):
 # HISTORIQUE
 # ----------------------------
 with st.expander("📚 Historique"):
-    analyses = get_analyses(st.user.email)
+    analyses = get_analyses(st.current_email)
     for a in analyses:
         st.write(a.get("note"))
 
