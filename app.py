@@ -327,14 +327,22 @@ if not current_email:
 
     st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
 
-    if st.button("🐙 Se connecter avec GitHub"):
-          response = supabase.auth.sign_in_with_oauth({
-          "provider": "github"
+if st.button("🐙 Se connecter avec GitHub"):
+    response = supabase.auth.sign_in_with_oauth({
+        "provider": "github"
     })
-    st.link_button("👉 Continuer avec GitHub", response.url)
-    session = supabase.auth.get_session()
-    st.write("SESSION:", session)
-    st.stop()
+
+    auth_url = getattr(response, "url", None)
+
+    if not auth_url and isinstance(response, dict):
+        auth_url = response.get("url")
+
+    if auth_url:
+        st.link_button("👉 Continuer avec GitHub", auth_url)
+        st.stop()
+    else:
+        st.error("Impossible de récupérer l'URL GitHub")
+        st.write(response)
 
     if st.button("💬 Se connecter avec Discord"):
         response = supabase.auth.sign_in_with_oauth({
