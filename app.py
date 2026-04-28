@@ -29,22 +29,66 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def is_parent():
+    profile = st.session_state.profile
+    return profile and profile.get("role") == "parent"
+
+
+def get_children_for_parent(parent_email):
+    result = (
+        supabase.table("profiles")
+        .select("*")
+        .eq("parent_email", parent_email)
+        .execute()
+    )
+    return result.data or []
+
+
+def parent_link_child(child_email, parent_email):
+    result = (
+        supabase.table("profiles")
+        .update({"parent_email": parent_email, "role": "child"})
+        .eq("email", child_email)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def set_parent_role(email):
+    result = (
+        supabase.table("profiles")
+        .update({"role": "parent"})
+        .eq("email", email)
+        .execute()
+    )
+    if result.data:
+        st.session_state.profile = result.data[0]
+        return True
+    return False
+
 def update_streak(email):
+    """Met à jour la streak quotidienne de l'utilisateur"""
     today = date.today()
 
-    profile = get_profile(email)
+    profile = get_profile_by_email(email)
+    if not profile:
+        return 0
+
     last_active = profile.get("last_active_date")
     streak = profile.get("streak", 0) or 0
 
     if last_active:
         last_active = date.fromisoformat(str(last_active))
 
+    # Déjà actif aujourd’hui → pas de changement
     if last_active == today:
         return streak
 
+    # Jour consécutif → +1
     if last_active == today - timedelta(days=1):
         streak += 1
     else:
+        # reset
         streak = 1
 
     result = (
@@ -186,12 +230,14 @@ def is_admin():
         return st.session_state.profile.get("email") in ADMIN_EMAILS
     return False
 
-def get_profile(email):
-    res = supabase.table("profiles").select("*").eq("email", email).execute()
-    return res.data[0] if res.data else None
+def get_profile_by_email(email):
+    result = supabase.table("profiles").select("*").eq("email", email).execute()
+    if result.data:
+        return result.data[0]
+    return None
 
 def ensure_profile(email):
-    profile = get_profile(email)
+    profile = get_profile_by_email(email)
     if profile:
         return profile
     res = supabase.table("profiles").insert({"email": email, "xp": 0}).execute()
@@ -307,6 +353,48 @@ with col3:
 
 if streak >= 3:
     st.success("🔥 Tu es en série ! Continue comme ça !")
+
+#Mode parent
+with st.expander("👨‍👩‍👧 Mode parent", expanded=False):
+    if not is_parent():
+        st.write("Active le mode parent pour suivre un enfant.")
+        if st.button("Activer le mode parent"):
+            if set_parent_role(st.user.email):
+                st.success("Mode parent activé.")
+                st.rerun()
+    else:
+        st.success("Mode parent actif")
+
+        child_email = st.text_input("Email de l'enfant à suivre")
+
+        if st.button("Associer cet enfant"):
+            linked = parent_link_child(child_email, st.user.email)
+            if linked:
+                st.success("Enfant associé.")
+                st.rerun()
+            else:
+                st.error("Aucun profil enfant trouvé avec cet email.")
+
+        children = get_children_for_parent(st.user.email)
+
+        st.write("### Enfants associés")
+
+        if children:
+            for child in children:
+                with st.expander(f"{child.get('email')} — {child.get('xp',0)} XP"):
+                    st.write(f"🔥 Streak : {child.get('streak', 0)} jour(s)")
+                    st.write(f"🎨 Niveau dessin : {child.get('niveau_dessin') or '—'}")
+
+                    child_analyses = get_analyses(child.get("email"))
+
+                    st.write(f"📚 Analyses : {len(child_analyses)}")
+
+                    for a in child_analyses[:5]:
+                        st.write(f"⭐ Note : {a.get('note', '—')}/10")
+                        if a.get("image_url") and str(a.get("image_url")).startswith("http"):
+                            st.image(a.get("image_url"), width=200)
+        else:
+            st.info("Aucun enfant associé pour le moment.")
 
 # XP
 xp = profile.get("xp", 0)
@@ -501,6 +589,19 @@ if file and st.button("Analyser"):
                 xp_gain += 25
 
             new_xp = xp + xp_gain
+
+            xp_gain = note * 5
+
+            if is_challenge:
+                xp_gain += 25
+
+                streak = profile.get("streak", 0)
+
+            if streak >= 3:
+                xp_gain += 10
+
+            if streak >= 7:
+                xp_gain += 20
 
             import uuid
             file_ext = file.name.split(".")[-1]
