@@ -361,10 +361,14 @@ current_email = get_current_email()
 
 if not current_email:
 
-    st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
+    st.title("Connexion")
+
+# 🔵 GOOGLE (TOUJOURS EN PREMIER)
+st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
 
 st.divider()
 
+# EMAIL / PASSWORD
 mode = st.radio("Choisis une action", ["Connexion", "Inscription"], horizontal=True)
 
 with st.form("email_auth_form"):
