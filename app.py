@@ -40,6 +40,24 @@ if "profile" not in st.session_state:
 # ----------------------------
 # UTILS
 # ----------------------------
+def update_profile(email, age, genre, niveau_dessin):
+    result = (
+        supabase.table("profiles")
+        .update({
+            "age": age if age else None,
+            "genre": genre if genre else None,
+            "niveau_dessin": niveau_dessin if niveau_dessin else None,
+        })
+        .eq("email", email)
+        .execute()
+    )
+
+    if result.data:
+        st.session_state.profile = result.data[0]
+        return True
+
+    return False
+
 def get_current_email():
     if st.user.is_logged_in and hasattr(st.user, "email"):
         return st.user.email
@@ -345,36 +363,58 @@ if not current_email:
 
     st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
 
-if st.button("🐙 Se connecter avec GitHub"):
-    response = supabase.auth.sign_in_with_oauth({
-        "provider": "github"
-    })
+st.divider()
 
-    auth_url = getattr(response, "url", None)
+mode = st.radio("Choisis une action", ["Connexion", "Inscription"], horizontal=True)
 
-    if not auth_url and isinstance(response, dict):
-        auth_url = response.get("url")
+with st.form("email_auth_form"):
+    email = st.text_input("Email")
+    password = st.text_input("Mot de passe", type="password")
 
-    if auth_url:
-        st.link_button("👉 Continuer avec GitHub", auth_url)
-        st.stop()
+    if mode == "Inscription":
+        age = st.number_input("Âge", min_value=5, max_value=100, value=10)
+        genre = st.selectbox("Genre", ["—", "Fille", "Garçon", "Autre"])
+        niveau = st.selectbox("Niveau dessin", ["Débutant", "Intermédiaire", "Avancé"])
 
-    if st.button("💬 Se connecter avec Discord"):
-        response = supabase.auth.sign_in_with_oauth({
-            "provider": "discord",
-        })
-        st.link_button("👉 Continuer avec Discord", response.url)
-        st.stop()
+    submitted = st.form_submit_button("Valider")
 
-    if st.button("🎵 Se connecter avec Spotify"):
-        response = supabase.auth.sign_in_with_oauth({
-            "provider": "spotify",
-            "options": {
-                "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
-            }
-        })
-        st.link_button("👉 Continuer avec Spotify", response.url)
-        st.stop()
+if submitted:
+    try:
+        if mode == "Connexion":
+            result = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password,
+            })
+
+            if result and result.user:
+                st.session_state.profile = ensure_profile(result.user.email)
+                st.success("✅ Connexion réussie")
+                st.rerun()
+
+        else:
+            result = supabase.auth.sign_up({
+                "email": email,
+                "password": password,
+            })
+
+            if result and result.user:
+                st.session_state.profile = ensure_profile(email)
+
+                update_profile(
+                    email,
+                    age,
+                    genre if genre != "—" else None,
+                    niveau
+                )
+
+                st.success("✅ Compte créé")
+                st.rerun()
+
+    except Exception as e:
+        st.error("Erreur d'authentification")
+        st.code(str(e))
+
+st.stop()
 # ----------------------------
 # LOAD PROFILE
 # ----------------------------
