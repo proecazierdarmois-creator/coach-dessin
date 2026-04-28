@@ -325,7 +325,7 @@ current_email = get_current_email()
 
 if not current_email:
 
-    st.button("🔵 Se connecter avec Google", on_click=st.login)
+    st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
 
     if st.button("🐙 Se connecter avec GitHub"):
         response = supabase.auth.sign_in_with_oauth({
