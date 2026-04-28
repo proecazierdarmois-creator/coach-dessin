@@ -18,6 +18,16 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 ADMIN_EMAILS = {"pro.ecazierdarmois@gmail.com"}
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+if "code" in st.query_params:
+    try:
+        code = st.query_params["code"]
+        supabase.auth.exchange_code_for_session({"auth_code": code})
+        st.query_params.clear()
+        st.rerun()
+    except Exception as e:
+        st.error("Erreur retour OAuth")
+        st.code(str(e))
+        st.stop()
 client = genai.Client(api_key=GEMINI_API_KEY)
 session = supabase.auth.get_session()
 
@@ -31,16 +41,18 @@ if "profile" not in st.session_state:
 # UTILS
 # ----------------------------
 def get_current_email():
-
-    # Google (Streamlit)
     if st.user.is_logged_in and hasattr(st.user, "email"):
         return st.user.email
 
-    # Supabase (GitHub, Discord, Spotify)
-    session = supabase.auth.get_session()
+    try:
+        session = supabase.auth.get_session()
+        if session and session.user:
+            return session.user.email
+    except:
+        pass
 
-    if session and session.user:
-        return session.user.email
+    if st.session_state.profile:
+        return st.session_state.profile.get("email")
 
     return None
 
