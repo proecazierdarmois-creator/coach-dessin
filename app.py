@@ -358,6 +358,7 @@ note, points_forts, ameliorations, defi, message_coach
 # LOGIN
 # ----------------------------
 current_email = get_current_email()
+st.write("DEBUG current_email:", current_email)
 
 if not current_email:
 
