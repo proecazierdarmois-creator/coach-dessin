@@ -442,6 +442,18 @@ profile = st.session_state.profile
 st.title("🎨 Coach de dessin IA")
 current_email = get_current_email()
 
+if st.button("🚪 Déconnexion"):
+    if st.user.is_logged_in:
+        st.logout()
+
+    try:
+        supabase.auth.sign_out()
+    except:
+        pass
+
+    st.session_state.profile = None
+    st.rerun()
+
 if not current_email:
     st.warning("Connecte-toi pour continuer.")
     st.stop()
