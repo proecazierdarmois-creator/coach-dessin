@@ -314,7 +314,7 @@ note, points_forts, ameliorations, defi, message_coach
 # ----------------------------
 if not st.user.is_logged_in:
     st.title("🎨 Coach de dessin IA")
-    st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
+    st.button("🔵 Se connecter avec Google")
     st.stop()
 
 # ----------------------------
