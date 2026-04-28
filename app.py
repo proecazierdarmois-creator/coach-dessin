@@ -30,11 +30,9 @@ if "profile" not in st.session_state:
 # UTILS
 # ----------------------------
 def get_current_email():
-    # Cas Google via Streamlit
     if st.user.is_logged_in and hasattr(st.user, "email"):
-        return st.current_email
+        return st.user.email
 
-    # Cas autres providers si profile déjà chargé
     if st.session_state.profile:
         return st.session_state.profile.get("email")
 
@@ -368,10 +366,13 @@ if st.session_state.profile is None:
     if st.user.is_logged_in and hasattr(st.user, "email"):
        current_email = get_current_email()
 
+current_email = get_current_email()
+
 if current_email and st.session_state.profile is None:
     st.session_state.profile = ensure_profile(current_email)
-else:
-    st.warning("Connecte-toi avec Google pour charger le profil Streamlit.")
+
+if not current_email:
+    st.warning("Connecte-toi pour continuer.")
     st.stop()
 
 profile = st.session_state.profile
