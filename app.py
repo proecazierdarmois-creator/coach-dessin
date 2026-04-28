@@ -314,10 +314,10 @@ note, points_forts, ameliorations, defi, message_coach
 # ----------------------------
 if not st.user.is_logged_in:
     st.title("🎨 Coach de dessin IA")
-    # 🔵 Google (Streamlit natif)
+    # 🔵 Google
 st.button("🔵 Se connecter avec Google", on_click=st.login)
 
-# 🐙 GitHub (Supabase OAuth)
+# 🐙 GitHub
 if st.button("🐙 Se connecter avec GitHub"):
     response = supabase.auth.sign_in_with_oauth({
         "provider": "github",
@@ -325,8 +325,29 @@ if st.button("🐙 Se connecter avec GitHub"):
             "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
         }
     })
+    st.link_button("👉 Continuer avec GitHub", response.url)
+    st.stop()
 
-    st.link_button("Continuer avec GitHub", response.url)
+# 💬 Discord
+if st.button("💬 Se connecter avec Discord"):
+    response = supabase.auth.sign_in_with_oauth({
+        "provider": "discord",
+        "options": {
+            "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
+        }
+    })
+    st.link_button("👉 Continuer avec Discord", response.url)
+    st.stop()
+
+# 🎵 Spotify
+if st.button("🎵 Se connecter avec Spotify"):
+    response = supabase.auth.sign_in_with_oauth({
+        "provider": "spotify",
+        "options": {
+            "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
+        }
+    })
+    st.link_button("👉 Continuer avec Spotify", response.url)
     st.stop()
 
 # ----------------------------
