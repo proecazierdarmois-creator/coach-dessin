@@ -364,7 +364,8 @@ if not current_email:
     st.title("Connexion")
 
 # 🔵 GOOGLE (TOUJOURS EN PREMIER)
-st.button("🔵 Se connecter avec Google", on_click=lambda: st.login("google"))
+st.subheader("Connexion rapide")
+st.button("🔵 Continuer avec Google", on_click=lambda: st.login("google"))
 
 st.divider()
 
