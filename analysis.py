@@ -30,16 +30,20 @@ Réponds uniquement en JSON valide :
 La note doit être un entier entre 1 et 10.
 """
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[
-            prompt,
-            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-        ],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
-    )
-
-    return json.loads(response.text)
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            ],
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        st.error("Erreur Gemini. Réessaie avec une autre image ou relance l’analyse.")
+        st.code(str(e))
+        return None
 
 
 def save_analysis(email, image_url, analysis):

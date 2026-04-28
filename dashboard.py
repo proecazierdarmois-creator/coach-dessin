@@ -45,12 +45,15 @@ def show_dashboard(profile, email):
             level = xp // 100
 
             analysis = analyze_drawing(
-                uploaded_file.getvalue(),
-                uploaded_file.type,
-                profile.get("age") or 10,
-                profile.get("niveau_dessin") or "Débutant",
-                level
-            )
+            uploaded_file.getvalue(),
+            uploaded_file.type,
+            profile.get("age") or 10,
+            profile.get("niveau_dessin") or "Débutant",
+            level
+        )
+
+        if analysis is None:
+            st.stop()
 
             saved = save_analysis(email, image_url, analysis)
 
