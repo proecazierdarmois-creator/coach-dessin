@@ -338,14 +338,10 @@ if st.button("🐙 Se connecter avec GitHub"):
         auth_url = response.get("url")
 
     if auth_url:
-        st.markdown(
-            f'<meta http-equiv="refresh" content="0; url={auth_url}">',
-            unsafe_allow_html=True
-        )
+        st.link_button("👉 Continuer avec GitHub", auth_url)
         st.stop()
     else:
-        st.error("Impossible de récupérer l'URL GitHub")
-        st.write(response)
+        st.error("Erreur OAuth")
 
     if st.button("💬 Se connecter avec Discord"):
         response = supabase.auth.sign_in_with_oauth({
