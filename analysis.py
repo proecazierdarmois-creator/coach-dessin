@@ -50,6 +50,8 @@ La note doit être un entier entre 1 et 10.
             return json.loads(response.text)
 
         except Exception as e:
+            st.write(f"Erreur avec {model}")
+            st.code(str(e))
             continue
 
     st.error("❌ Aucun modèle Gemini disponible pour le moment. Réessaie dans quelques minutes.")
