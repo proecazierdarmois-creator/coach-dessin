@@ -330,9 +330,6 @@ if not current_email:
     if st.button("🐙 Se connecter avec GitHub"):
         response = supabase.auth.sign_in_with_oauth({
             "provider": "github",
-            "options": {
-                "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
-            }
         })
         st.link_button("👉 Continuer avec GitHub", response.url)
         st.stop()
@@ -340,9 +337,6 @@ if not current_email:
     if st.button("💬 Se connecter avec Discord"):
         response = supabase.auth.sign_in_with_oauth({
             "provider": "discord",
-            "options": {
-                "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
-            }
         })
         st.link_button("👉 Continuer avec Discord", response.url)
         st.stop()
@@ -356,7 +350,6 @@ if not current_email:
         })
         st.link_button("👉 Continuer avec Spotify", response.url)
         st.stop()
-
 # ----------------------------
 # LOAD PROFILE
 # ----------------------------
