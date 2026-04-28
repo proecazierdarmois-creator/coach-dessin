@@ -19,23 +19,7 @@ ADMIN_EMAILS = {"pro.ecazierdarmois@gmail.com"}
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 client = genai.Client(api_key=GEMINI_API_KEY)
-
-if "code" in st.query_params:
-    try:
-        code = st.query_params.get("code")
-
-        if isinstance(code, list):
-            code = code[0]
-
-        supabase.auth.exchange_code_for_session(code)
-
-        st.query_params.clear()
-        st.rerun()
-
-    except Exception as e:
-        st.error("Erreur retour OAuth")
-        st.code(str(e))
-        st.stop()
+session = supabase.auth.get_session()
 
 # ----------------------------
 # SESSION
@@ -47,18 +31,16 @@ if "profile" not in st.session_state:
 # UTILS
 # ----------------------------
 def get_current_email():
+
+    # Google (Streamlit)
     if st.user.is_logged_in and hasattr(st.user, "email"):
         return st.user.email
 
-    try:
-        session = supabase.auth.get_session()
-        if session and session.user and session.user.email:
-            return session.user.email
-    except:
-        pass
+    # Supabase (GitHub, Discord, Spotify)
+    session = supabase.auth.get_session()
 
-    if st.session_state.profile:
-        return st.session_state.profile.get("email")
+    if session and session.user:
+        return session.user.email
 
     return None
 
@@ -364,8 +346,6 @@ if st.button("🐙 Se connecter avec GitHub"):
     if auth_url:
         st.link_button("👉 Continuer avec GitHub", auth_url)
         st.stop()
-    else:
-        st.error("Erreur OAuth")
 
     if st.button("💬 Se connecter avec Discord"):
         response = supabase.auth.sign_in_with_oauth({
