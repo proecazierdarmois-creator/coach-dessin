@@ -31,6 +31,9 @@ if "code" in st.query_params:
 client = genai.Client(api_key=GEMINI_API_KEY)
 session = supabase.auth.get_session()
 
+st.write("st.user:", st.user)
+st.write("current_email:", current_email)
+
 # ----------------------------
 # SESSION
 # ----------------------------
