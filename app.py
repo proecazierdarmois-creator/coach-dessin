@@ -234,7 +234,7 @@ def admin_update_profile(email, xp):
 
 def is_admin():
     if st.user.is_logged_in:
-        return st.current_email in ADMIN_EMAILS
+        return current_email in ADMIN_EMAILS
     if st.session_state.profile:
         return st.session_state.profile.get("email") in ADMIN_EMAILS
     return False
