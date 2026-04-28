@@ -7,36 +7,63 @@ from utils import supabase
 import time
 
 def analyze_drawing(image_bytes, mime_type, age=10, niveau="Débutant", level=0):
-    prompt = f"""..."""
+    prompt = f"""
+Tu es un coach de dessin IA pour enfants.
 
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[
-                    prompt,
-                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                ],
-                config=types.GenerateContentConfig(response_mime_type="application/json"),
-            )
+Analyse le dessin et réponds UNIQUEMENT avec ce JSON exact :
 
-            return json.loads(response.text)
+{{
+  "note": 7,
+  "points_forts": [
+    "point positif 1",
+    "point positif 2"
+  ],
+  "ameliorations": [
+    "conseil simple 1",
+    "conseil simple 2"
+  ],
+  "defi": "un petit défi amusant pour le prochain dessin",
+  "message_coach": "un message encourageant"
+}}
 
-        except Exception as e:
-            if "503" in str(e) or "UNAVAILABLE" in str(e):
-                time.sleep(2)  # attendre 2 sec
-                continue
+Règles obligatoires :
+- Ne décris pas seulement l'image.
+- Donne une note entière entre 1 et 10.
+- Les points_forts doivent être des qualités du dessin.
+- Les ameliorations doivent être des conseils pour progresser.
+- Réponds seulement en JSON, sans texte autour.
 
-            if "429" in str(e):
-                st.warning("⏳ Trop de requêtes. Réessaie dans 1 minute.")
-                return None
+Profil :
+- âge : {age}
+- niveau déclaré : {niveau}
+- niveau XP : {level}
+"""
 
-            st.error("Erreur IA")
-            st.code(str(e))
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            ),
+        )
+
+        data = json.loads(response.text)
+
+        if "note" not in data:
+            st.error("Gemini n'a pas renvoyé une analyse au bon format.")
+            st.write(data)
             return None
 
-    st.error("❌ Serveur IA surchargé, réessaie dans quelques secondes")
-    return None
+        return data
+
+    except Exception as e:
+        st.error("Erreur Gemini")
+        st.code(str(e))
+        return None
 
 
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
