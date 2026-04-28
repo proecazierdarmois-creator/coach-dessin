@@ -321,43 +321,41 @@ note, points_forts, ameliorations, defi, message_coach
 # ----------------------------
 # LOGIN
 # ----------------------------
-if not st.user.is_logged_in:
-    st.title("🎨 Coach de dessin IA")
-    # 🔵 Google
-st.button("🔵 Se connecter avec Google", on_click=st.login)
+current_email = get_current_email()
 
-# 🐙 GitHub
-if st.button("🐙 Se connecter avec GitHub"):
-    response = supabase.auth.sign_in_with_oauth({
-        "provider": "github",
-        "options": {
-            "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
-        }
-    })
-    st.link_button("👉 Continuer avec GitHub", response.url)
-    st.stop()
+if not current_email:
 
-# 💬 Discord
-if st.button("💬 Se connecter avec Discord"):
-    response = supabase.auth.sign_in_with_oauth({
-        "provider": "discord",
-        "options": {
-            "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
-        }
-    })
-    st.link_button("👉 Continuer avec Discord", response.url)
-    st.stop()
+    st.button("🔵 Se connecter avec Google", on_click=st.login)
 
-# 🎵 Spotify
-if st.button("🎵 Se connecter avec Spotify"):
-    response = supabase.auth.sign_in_with_oauth({
-        "provider": "spotify",
-        "options": {
-            "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
-        }
-    })
-    st.link_button("👉 Continuer avec Spotify", response.url)
-    st.stop()
+    if st.button("🐙 Se connecter avec GitHub"):
+        response = supabase.auth.sign_in_with_oauth({
+            "provider": "github",
+            "options": {
+                "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
+            }
+        })
+        st.link_button("👉 Continuer avec GitHub", response.url)
+        st.stop()
+
+    if st.button("💬 Se connecter avec Discord"):
+        response = supabase.auth.sign_in_with_oauth({
+            "provider": "discord",
+            "options": {
+                "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
+            }
+        })
+        st.link_button("👉 Continuer avec Discord", response.url)
+        st.stop()
+
+    if st.button("🎵 Se connecter avec Spotify"):
+        response = supabase.auth.sign_in_with_oauth({
+            "provider": "spotify",
+            "options": {
+                "redirect_to": "https://coach-dessin-4euqq6idacmz4qgguh2mce.streamlit.app"
+            }
+        })
+        st.link_button("👉 Continuer avec Spotify", response.url)
+        st.stop()
 
 # ----------------------------
 # LOAD PROFILE
