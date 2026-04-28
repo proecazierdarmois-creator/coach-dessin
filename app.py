@@ -20,6 +20,16 @@ ADMIN_EMAILS = {"pro.ecazierdarmois@gmail.com"}
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+if "code" in st.query_params:
+    try:
+        supabase.auth.exchange_code_for_session(st.query_params["code"])
+        st.query_params.clear()
+        st.rerun()
+    except Exception as e:
+        st.error("Erreur retour OAuth")
+        st.code(str(e))
+        st.stop()
+
 # ----------------------------
 # SESSION
 # ----------------------------
@@ -32,6 +42,13 @@ if "profile" not in st.session_state:
 def get_current_email():
     if st.user.is_logged_in and hasattr(st.user, "email"):
         return st.user.email
+
+    try:
+        session = supabase.auth.get_session()
+        if session and session.user and session.user.email:
+            return session.user.email
+    except:
+        pass
 
     if st.session_state.profile:
         return st.session_state.profile.get("email")
