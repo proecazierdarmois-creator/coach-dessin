@@ -1,5 +1,6 @@
 import streamlit as st
 from analysis import analyze_drawing, save_analysis, upload_image, update_xp
+import time
 
 def show_dashboard(profile, email):
     st.title("🎨 Coach de dessin IA")
@@ -36,27 +37,37 @@ def show_dashboard(profile, email):
     st.subheader("📸 Analyse")
 
     uploaded_file = st.file_uploader("Upload dessin", type=["png", "jpg", "jpeg"])
+    analyse_button = st.button("Analyser")
 
-    if uploaded_file and st.button("Analyser"):
+    if uploaded_file and analyse_button:
+        if "last_analysis_time" not in st.session_state:
+            st.session_state.last_analysis_time = 0
+
+        now = time.time()
+        if now - st.session_state.last_analysis_time < 5:
+            st.warning("⏳ Attends quelques secondes avant une nouvelle analyse")
+            return
+
+        st.session_state.last_analysis_time = now
+
         with st.spinner("Analyse en cours..."):
             image_url = upload_image(email, uploaded_file)
-
-            xp = profile.get("xp", 0)
-            level = xp // 100
+            if not image_url:
+                st.error("Impossible de téléverser l'image.")
+                return
 
             analysis = analyze_drawing(
-            uploaded_file.getvalue(),
-            uploaded_file.type,
-            profile.get("age") or 10,
-            profile.get("niveau_dessin") or "Débutant",
-            level
-        )
+                uploaded_file.getvalue(),
+                uploaded_file.type,
+                profile.get("age") or 10,
+                profile.get("niveau_dessin") or "Débutant",
+                level,
+            )
 
-        if analysis is None:
-            st.stop()
+            if analysis is None:
+                return
 
             saved = save_analysis(email, image_url, analysis)
-
             note = saved.get("note", 0) if saved else 0
             profile, xp_gain = update_xp(email, profile, note)
 

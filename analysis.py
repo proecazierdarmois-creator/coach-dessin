@@ -4,42 +4,15 @@ import streamlit as st
 from google import genai
 from google.genai import types
 from utils import supabase
-
-
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-
+import time
 
 def analyze_drawing(image_bytes, mime_type, age=10, niveau="Débutant", level=0):
-    prompt = f"""
-Tu es un coach de dessin IA bienveillant.
+    prompt = f"""..."""
 
-Profil :
-- âge : {age}
-- niveau déclaré : {niveau}
-- niveau XP : {level}
-
-Réponds uniquement en JSON valide :
-{{
-  "note": 7,
-  "points_forts": ["...", "..."],
-  "ameliorations": ["...", "..."],
-  "defi": "...",
-  "message_coach": "..."
-}}
-
-La note doit être un entier entre 1 et 10.
-"""
-
-    models = [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-pro"
-    ]
-
-    for model in models:
+    for attempt in range(3):
         try:
             response = client.models.generate_content(
-                model=model,
+                model="gemini-2.5-flash",
                 contents=[
                     prompt,
                     types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
@@ -50,12 +23,23 @@ La note doit être un entier entre 1 et 10.
             return json.loads(response.text)
 
         except Exception as e:
-            st.write(f"Erreur avec {model}")
-            st.code(str(e))
-            continue
+            if "503" in str(e) or "UNAVAILABLE" in str(e):
+                time.sleep(2)  # attendre 2 sec
+                continue
 
-    st.error("❌ Aucun modèle Gemini disponible pour le moment. Réessaie dans quelques minutes.")
+            if "429" in str(e):
+                st.warning("⏳ Trop de requêtes. Réessaie dans 1 minute.")
+                return None
+
+            st.error("Erreur IA")
+            st.code(str(e))
+            return None
+
+    st.error("❌ Serveur IA surchargé, réessaie dans quelques secondes")
     return None
+
+
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 
 def save_analysis(email, image_url, analysis):
