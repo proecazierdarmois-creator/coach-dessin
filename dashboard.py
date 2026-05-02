@@ -96,21 +96,21 @@ def show_dashboard(profile, email):
     with st.expander("🖼️ Galerie de tes dessins", expanded=True):
         analyses = get_analyses(email)
 
-    if not analyses:
-        st.info("Aucun dessin pour le moment.")
-    else:
-        cols = st.columns(3)
+        if not analyses:
+            st.info("Aucun dessin pour le moment.")
+        else:
+            cols = st.columns(3)
 
-        for i, a in enumerate(analyses[:12]):
-            with cols[i % 3]:
-                image_url = a.get("image_url")
+            for i, a in enumerate(analyses[:12]):
+                with cols[i % 3]:
+                    image_url = a.get("image_url")
 
-                if image_url and str(image_url).startswith("http"):
-                    st.image(image_url, use_container_width=True)
-                else:
-                    st.caption("Image non disponible")
+                    if image_url and str(image_url).startswith("http"):
+                        st.image(image_url, use_container_width=True)
+                    else:
+                        st.caption("Image non disponible")
 
-                st.markdown(f"⭐ **{a.get('note', '—')}/10**")
+                    st.markdown(f"⭐ **{a.get('note', '—')}/10**")
 
                 with st.expander("Détails"):
                     if a.get("points_forts"):
