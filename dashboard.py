@@ -1,6 +1,7 @@
 import streamlit as st
 from analysis import analyze_drawing, save_analysis, upload_image, update_xp
 import time
+from utils import get_analyses
 
 def show_dashboard(profile, email):
     st.title("🎨 Coach de dessin IA")
@@ -89,3 +90,41 @@ def show_dashboard(profile, email):
 
             st.info(analysis.get("defi", ""))
             st.success(analysis.get("message_coach", ""))
+
+            st.write("---")
+
+with st.expander("🖼️ Galerie de tes dessins", expanded=True):
+    analyses = get_analyses(email)
+
+    if not analyses:
+        st.info("Aucun dessin pour le moment.")
+    else:
+        cols = st.columns(3)
+
+        for i, a in enumerate(analyses[:12]):
+            with cols[i % 3]:
+                image_url = a.get("image_url")
+
+                if image_url and str(image_url).startswith("http"):
+                    st.image(image_url, use_container_width=True)
+                else:
+                    st.caption("Image non disponible")
+
+                st.markdown(f"⭐ **{a.get('note', '—')}/10**")
+
+                with st.expander("Détails"):
+                    if a.get("points_forts"):
+                        st.write("**💪 Points forts**")
+                        for p in a.get("points_forts"):
+                            st.write(f"• {p}")
+
+                    if a.get("ameliorations"):
+                        st.write("**📈 À améliorer**")
+                        for p in a.get("ameliorations"):
+                            st.write(f"• {p}")
+
+                    if a.get("defi"):
+                        st.info(a.get("defi"))
+
+                    if a.get("message_coach"):
+                        st.success(a.get("message_coach"))

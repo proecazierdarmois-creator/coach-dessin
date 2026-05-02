@@ -21,3 +21,13 @@ def ensure_profile(email):
     }).execute()
 
     return result.data[0]
+
+def get_analyses(email):
+    result = (
+        supabase.table("analyses")
+        .select("*")
+        .eq("email", email)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return result.data or []
