@@ -1,7 +1,7 @@
 import streamlit as st
 from analysis import analyze_drawing, save_analysis, upload_image, update_xp
 import time
-from utils import get_analyses
+from utils import get_analyses, is_admin, get_all_profiles, admin_update_xp, admin_delete_analysis
 
 def show_dashboard(profile, email):
     st.title("🎨 Coach de dessin IA")
@@ -33,6 +33,52 @@ def show_dashboard(profile, email):
 
     st.progress(xp_in_level / 100)
     st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
+
+    st.write("---")
+
+    if is_admin(email):
+        with st.expander("🛠️ Admin", expanded=False):
+            profiles = get_all_profiles()
+
+            if not profiles:
+                st.info("Aucun profil trouvé.")
+            else:
+                emails = [p.get("email") for p in profiles if p.get("email")]
+                selected_email = st.selectbox("Utilisateur", emails)
+
+                selected_profile = next(
+                    (p for p in profiles if p.get("email") == selected_email),
+                    None
+                )
+
+                if selected_profile:
+                    new_xp = st.number_input(
+                        "XP",
+                        min_value=0,
+                        max_value=100000,
+                        value=selected_profile.get("xp") or 0,
+                        step=10,
+                    )
+
+                    if st.button("💾 Modifier XP"):
+                        admin_update_xp(selected_email, new_xp)
+                        st.success("XP mis à jour.")
+                        st.rerun()
+
+                    st.write("### Analyses utilisateur")
+                    analyses = get_analyses(selected_email)
+
+                    for a in analyses[:10]:
+                        with st.expander(f"Analyse {a.get('created_at', '')[:10]} — {a.get('note', '—')}/10"):
+                            image_url = a.get("image_url")
+
+                            if image_url and str(image_url).startswith("http"):
+                                st.image(image_url, width=250)
+
+                            if st.button("🗑️ Supprimer cette analyse", key=f"delete_analysis_{a['id']}"):
+                                admin_delete_analysis(a["id"])
+                                st.success("Analyse supprimée.")
+                                st.rerun()
 
     st.write("---")
     st.subheader("📸 Analyse")
