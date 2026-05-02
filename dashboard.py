@@ -91,7 +91,8 @@ def show_dashboard(profile, email):
             st.info(analysis.get("defi", ""))
             st.success(analysis.get("message_coach", ""))
 
-            st.write("---")
+        
+    st.write("---")
 
     with st.expander("🖼️ Galerie de tes dessins", expanded=True):
         analyses = get_analyses(email)
@@ -112,19 +113,19 @@ def show_dashboard(profile, email):
 
                     st.markdown(f"⭐ **{a.get('note', '—')}/10**")
 
-                with st.expander("Détails"):
-                    if a.get("points_forts"):
-                        st.write("**💪 Points forts**")
-                        for p in a.get("points_forts"):
-                            st.write(f"• {p}")
+                    with st.expander("Détails"):
+                        if a.get("points_forts"):
+                            st.write("**💪 Points forts**")
+                            for p in a.get("points_forts"):
+                                st.write(f"• {p}")
 
-                    if a.get("ameliorations"):
-                        st.write("**📈 À améliorer**")
-                        for p in a.get("ameliorations"):
-                            st.write(f"• {p}")
+                        if a.get("ameliorations"):
+                            st.write("**📈 À améliorer**")
+                            for p in a.get("ameliorations"):
+                                st.write(f"• {p}")
 
-                    if a.get("defi"):
-                        st.info(a.get("defi"))
+                        if a.get("defi"):
+                            st.info(a.get("defi"))
 
-                    if a.get("message_coach"):
-                        st.success(a.get("message_coach"))
+                        if a.get("message_coach"):
+                            st.success(a.get("message_coach"))
