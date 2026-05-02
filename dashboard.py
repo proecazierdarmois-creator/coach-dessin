@@ -93,8 +93,8 @@ def show_dashboard(profile, email):
 
             st.write("---")
 
-with st.expander("🖼️ Galerie de tes dessins", expanded=True):
-    analyses = get_analyses(email)
+    with st.expander("🖼️ Galerie de tes dessins", expanded=True):
+        analyses = get_analyses(email)
 
     if not analyses:
         st.info("Aucun dessin pour le moment.")
