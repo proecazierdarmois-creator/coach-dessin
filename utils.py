@@ -1,10 +1,43 @@
 from supabase import create_client
 import streamlit as st
+from datetime import date, timedelta
 
 supabase = create_client(
     st.secrets["SUPABASE_URL"],
     st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
 )
+def update_streak(email):
+    today = date.today()
+
+    profile = get_profile(email)
+    if not profile:
+        return 0
+
+    streak = profile.get("streak", 0) or 0
+    last_active = profile.get("last_active_date")
+
+    if last_active:
+        last_active = date.fromisoformat(str(last_active))
+
+    if last_active == today:
+        return streak
+
+    if last_active == today - timedelta(days=1):
+        streak += 1
+    else:
+        streak = 1
+
+    result = (
+        supabase.table("profiles")
+        .update({
+            "streak": streak,
+            "last_active_date": str(today),
+        })
+        .eq("email", email)
+        .execute()
+    )
+
+    return result.data[0] if result.data else profile
 
 def is_admin(email):
     admin_emails = [

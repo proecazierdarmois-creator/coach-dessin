@@ -2,8 +2,10 @@ import streamlit as st
 from analysis import analyze_drawing, save_analysis, upload_image, update_xp
 import time
 from utils import get_analyses, is_admin, get_all_profiles, admin_update_xp, admin_delete_analysis
+from utils import update_streak
 
 def show_dashboard(profile, email):
+    profile = update_streak(email)
     st.title("🎨 Coach de dessin IA")
 
     col1, col2 = st.columns([3, 1])
@@ -22,14 +24,18 @@ def show_dashboard(profile, email):
     xp = profile.get("xp", 0)
     level = xp // 100
     xp_in_level = xp % 100
+    streak = profile.get("streak", 0) or 0
 
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
 
     with c1:
         st.metric("⭐ XP", xp)
 
     with c2:
         st.metric("🏆 Niveau", level)
+
+    with c3:
+        st.metric("🔥 Streak", f"{streak} jour(s)")
 
     st.progress(xp_in_level / 100)
     st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
