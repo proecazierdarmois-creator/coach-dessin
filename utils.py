@@ -18,6 +18,7 @@ def get_all_profiles():
     result = (
         supabase.table("profiles")
         .select("*")
+        .neq("email", "test@example.com")
         .order("xp", desc=True)
         .execute()
     )
@@ -42,22 +43,20 @@ def get_profile(email):
     return result.data[0] if result.data else None
 
 def ensure_profile(email):
+    # 👉 ignore les faux emails
+    if not email or email == "test@example.com":
+        return None
+
     profile = get_profile(email)
     if profile:
         return profile
 
-    try:
-        result = supabase.table("profiles").insert({
-            "email": email,
-            "xp": 0,
-        }).execute()
+    result = supabase.table("profiles").insert({
+        "email": email,
+        "xp": 0,
+    }).execute()
 
-        return result.data[0] if result.data else None
-
-    except Exception as e:
-        st.error("Erreur création profil Supabase")
-        st.code(str(e))
-        st.stop()
+    return result.data[0] if result.data else None
 
 def get_analyses(email):
     result = (
