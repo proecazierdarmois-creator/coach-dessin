@@ -3,9 +3,12 @@ from analysis import analyze_drawing, save_analysis, upload_image, update_xp
 import time
 from utils import get_analyses, is_admin, get_all_profiles, admin_update_xp, admin_delete_analysis
 from utils import update_streak
+from utils import get_leaderboard
 
 def show_dashboard(profile, email):
     profile = update_streak(email)
+    if "page" not in st.session_state:
+        st.session_state.page = "home"
     st.title("🎨 Coach de dessin IA")
 
     col1, col2 = st.columns([3, 1])
@@ -39,6 +42,38 @@ def show_dashboard(profile, email):
 
     st.progress(xp_in_level / 100)
     st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
+
+    if st.button("🏆 Voir le classement"):
+        st.session_state.page = "leaderboard"
+
+    if st.session_state.page == "leaderboard":
+        st.write("---")
+        st.subheader("🏆 Classement général")
+
+        leaderboard = get_leaderboard()
+
+    if not leaderboard:
+        st.info("Aucun utilisateur dans le classement.")
+    else:
+        medals = ["🥇", "🥈", "🥉"]
+
+        for i, user in enumerate(leaderboard):
+            rank = medals[i] if i < 3 else f"{i + 1}."
+
+            if user.get("email") == email:
+                st.success(
+                    f"{rank} {user.get('email')} — {user.get('xp', 0)} XP — 🔥 {user.get('streak', 0)} jour(s)"
+                )
+            else:
+                st.write(
+                    f"{rank} {user.get('email')} — {user.get('xp', 0)} XP — 🔥 {user.get('streak', 0)} jour(s)"
+                )
+
+    if st.button("⬅️ Retour au dashboard"):
+        st.session_state.page = "home"
+        st.rerun()
+
+    st.stop()
 
     st.write("---")
 
