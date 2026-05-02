@@ -70,19 +70,25 @@ client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 
 def save_analysis(email, image_url, analysis):
-    note = int(str(analysis.get("note", 0)).split("/")[0].strip())
+    try:
+        note = int(str(analysis.get("note", 0)).split("/")[0].strip())
 
-    result = supabase.table("analyses").insert({
-        "email": email,
-        "image_url": image_url,
-        "note": note,
-        "points_forts": analysis.get("points_forts", []),
-        "ameliorations": analysis.get("ameliorations", []),
-        "defi": analysis.get("defi", ""),
-        "message_coach": analysis.get("message_coach", ""),
-    }).execute()
+        result = supabase.table("analyses").insert({
+            "email": email,
+            "image_url": image_url,
+            "note": note,
+            "points_forts": analysis.get("points_forts", []),
+            "ameliorations": analysis.get("ameliorations", []),
+            "defi": analysis.get("defi", ""),
+            "message_coach": analysis.get("message_coach", ""),
+        }).execute()
 
-    return result.data[0] if result.data else None
+        return result.data[0] if result.data else None
+
+    except Exception as e:
+        st.error("Erreur sauvegarde analyse Supabase")
+        st.code(str(e))
+        st.stop()
 
 
 def upload_image(email, uploaded_file):
