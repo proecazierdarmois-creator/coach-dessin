@@ -15,12 +15,18 @@ def ensure_profile(email):
     if profile:
         return profile
 
-    result = supabase.table("profiles").insert({
-        "email": email,
-        "xp": 0,
-    }).execute()
+    try:
+        result = supabase.table("profiles").insert({
+            "email": email,
+            "xp": 0,
+        }).execute()
 
-    return result.data[0]
+        return result.data[0] if result.data else None
+
+    except Exception as e:
+        st.error("Erreur création profil Supabase")
+        st.code(str(e))
+        st.stop()
 
 def get_analyses(email):
     result = (
