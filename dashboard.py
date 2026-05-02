@@ -2,78 +2,111 @@ import streamlit as st
 from analysis import analyze_drawing, save_analysis, upload_image, update_xp
 import time
 from utils import get_analyses, is_admin, get_all_profiles, admin_update_xp, admin_delete_analysis
-from utils import update_streak
-from utils import get_leaderboard
+from utils import update_streak, get_leaderboard
 
 def show_dashboard(profile, email):
-    profile = update_streak(email)
+
+    profile = update_streak(email) or profile
+
     if "page" not in st.session_state:
+
         st.session_state.page = "home"
+
+    # ----------------------------
+    # PAGE CLASSEMENT
+    # ----------------------------
+
+    if st.session_state.page == "leaderboard":
+
+        st.title("🏆 Classement général")
+
+        leaderboard = get_leaderboard()
+
+        if not leaderboard:
+
+            st.info("Aucun utilisateur dans le classement.")
+
+        else:
+
+            medals = ["🥇", "🥈", "🥉"]
+
+            for i, user in enumerate(leaderboard):
+
+                rank = medals[i] if i < 3 else f"{i + 1}."
+
+                line = f"{rank} {user.get('email')} — {user.get('xp', 0)} XP — 🔥 {user.get('streak', 0)} jour(s)"
+
+                if user.get("email") == email:
+
+                    st.success(line + " (toi)")
+
+                else:
+
+                    st.write(line)
+
+        if st.button("⬅️ Retour au dashboard"):
+
+            st.session_state.page = "home"
+
+            st.rerun()
+
+        st.stop()
+
+    # ----------------------------
+    # PAGE DASHBOARD
+    # ----------------------------
+
     st.title("🎨 Coach de dessin IA")
 
     col1, col2 = st.columns([3, 1])
 
     with col1:
+
         st.write(f"Bienvenue {st.user.name} 👋")
+
         st.caption(f"Connecté : {email}")
 
     with col2:
+
         if st.button("🚪 Déconnexion"):
+
             st.logout()
+
             st.rerun()
 
     st.write("---")
 
     xp = profile.get("xp", 0)
+
     level = xp // 100
+
     xp_in_level = xp % 100
+
     streak = profile.get("streak", 0) or 0
 
     c1, c2, c3 = st.columns(3)
 
     with c1:
+
         st.metric("⭐ XP", xp)
 
     with c2:
+
         st.metric("🏆 Niveau", level)
 
     with c3:
+
         st.metric("🔥 Streak", f"{streak} jour(s)")
 
     st.progress(xp_in_level / 100)
+
     st.caption(f"{xp_in_level}/100 XP vers le niveau suivant")
 
     if st.button("🏆 Voir le classement"):
+
         st.session_state.page = "leaderboard"
 
-    if st.session_state.page == "leaderboard":
-        st.write("---")
-        st.subheader("🏆 Classement général")
-
-        leaderboard = get_leaderboard()
-
-    if not leaderboard:
-        st.info("Aucun utilisateur dans le classement.")
-    else:
-        medals = ["🥇", "🥈", "🥉"]
-
-        for i, user in enumerate(leaderboard):
-            rank = medals[i] if i < 3 else f"{i + 1}."
-
-            if user.get("email") == email:
-                st.success(
-                    f"{rank} {user.get('email')} — {user.get('xp', 0)} XP — 🔥 {user.get('streak', 0)} jour(s)"
-                )
-            else:
-                st.write(
-                    f"{rank} {user.get('email')} — {user.get('xp', 0)} XP — 🔥 {user.get('streak', 0)} jour(s)"
-                )
-
-    if st.button("⬅️ Retour au dashboard"):
-        st.session_state.page = "home"
         st.rerun()
-
-    st.stop()
 
     st.write("---")
 
