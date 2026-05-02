@@ -22,7 +22,7 @@ def update_streak(email):
 
     profile = get_profile(email)
     if not profile:
-        return 0
+        return None
 
     streak = profile.get("streak", 0) or 0
     last_active = profile.get("last_active_date")
@@ -31,7 +31,7 @@ def update_streak(email):
         last_active = date.fromisoformat(str(last_active))
 
     if last_active == today:
-        return streak
+        return profile
 
     if last_active == today - timedelta(days=1):
         streak += 1
