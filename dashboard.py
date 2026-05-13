@@ -3,6 +3,22 @@ from analysis import analyze_drawing, save_analysis, upload_image, update_xp
 import time
 from utils import get_analyses, is_admin, get_all_profiles, admin_update_xp, admin_delete_analysis
 from utils import update_streak, get_leaderboard
+from utils import get_badges
+
+# ----------------------------
+ # LANGUE
+ # ----------------------------
+if "lang" not in st.session_state:
+        st.session_state.lang = "Français"
+
+lang = st.selectbox(
+        "🌍 Langue",
+        ["Français", "English", "Español"],
+        index=["Français", "English", "Español"].index(st.session_state.lang)
+    )
+
+st.session_state.lang = lang
+
 
 def show_dashboard(profile, email):
 
@@ -11,6 +27,37 @@ def show_dashboard(profile, email):
     if "page" not in st.session_state:
 
         st.session_state.page = "home"
+
+    translations = {
+        "Français": {
+            "welcome": "Bienvenue",
+            "logout": "🚪 Déconnexion",
+            "leaderboard": "🏆 Voir le classement",
+            "badges": "🏅 Badges",
+            "gallery": "🖼️ Galerie de tes dessins",
+            "analysis": "📸 Analyse",
+        },
+
+        "English": {
+            "welcome": "Welcome",
+            "logout": "🚪 Logout",
+            "leaderboard": "🏆 Leaderboard",
+            "badges": "🏅 Badges",
+            "gallery": "🖼️ Your drawings gallery",
+            "analysis": "📸 Analysis",
+        },
+
+        "Español": {
+            "welcome": "Bienvenido",
+            "logout": "🚪 Cerrar sesión",
+            "leaderboard": "🏆 Clasificación",
+            "badges": "🏅 Insignias",
+            "gallery": "🖼️ Galería de dibujos",
+            "analysis": "📸 Análisis",
+        }
+    }
+
+    t = translations[lang]
 
     # ----------------------------
     # PAGE CLASSEMENT
@@ -107,6 +154,15 @@ def show_dashboard(profile, email):
         st.session_state.page = "leaderboard"
 
         st.rerun()
+
+    badges = get_badges(email, xp, streak)
+
+    with st.expander("🏅 Badges", expanded=True):
+        if badges:
+            for badge in badges:
+                st.write(badge)
+        else:
+            st.info("Aucun badge pour le moment. Analyse ton premier dessin !")
 
     st.write("---")
 
@@ -211,7 +267,6 @@ def show_dashboard(profile, email):
             st.info(analysis.get("defi", ""))
             st.success(analysis.get("message_coach", ""))
 
-        
     st.write("---")
 
     with st.expander("🖼️ Galerie de tes dessins", expanded=True):
@@ -241,7 +296,7 @@ def show_dashboard(profile, email):
 
                         if a.get("ameliorations"):
                             st.write("**📈 À améliorer**")
-                            for p in a.get("ameliorations"):
+                            for p in a.get("ameliorations", []):
                                 st.write(f"• {p}")
 
                         if a.get("defi"):

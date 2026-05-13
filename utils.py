@@ -6,6 +6,38 @@ supabase = create_client(
     st.secrets["SUPABASE_URL"],
     st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
 )
+def get_badges(email, xp, streak):
+    analyses = get_analyses(email)
+    count = len(analyses)
+
+    badges = []
+
+    if count >= 1:
+        badges.append("🎨 Premier dessin")
+
+    if count >= 5:
+        badges.append("🖼️ 5 dessins analysés")
+
+    if count >= 10:
+        badges.append("🏅 10 dessins analysés")
+
+    if xp >= 100:
+        badges.append("⭐ 100 XP")
+
+    if xp >= 500:
+        badges.append("🚀 500 XP")
+
+    if streak >= 3:
+        badges.append("🔥 Streak 3 jours")
+
+    if streak >= 7:
+        badges.append("🔥🔥 Streak 7 jours")
+
+    if any((a.get("note") or 0) >= 8 for a in analyses):
+        badges.append("🌟 Note de 8 ou plus")
+
+    return badges
+
 def get_leaderboard(limit=20):
     result = (
         supabase.table("profiles")
