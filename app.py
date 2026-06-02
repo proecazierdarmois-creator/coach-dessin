@@ -1,31 +1,18 @@
 import streamlit as st
 
-from auth import show_login
-from utils import ensure_profile
-from dashboard import show_dashboard
+st.write("USER:")
+st.write(st.user)
 
-st.set_page_config(
-    page_title="Coach de dessin IA",
-    page_icon="🎨",
-    layout="wide",
-)
-
-if "email" not in st.session_state:
-    st.session_state.email = None
-
-if "profile" not in st.session_state:
-    st.session_state.profile = None
-
-if not st.session_state.email:
-    show_login()
-
-email = st.session_state.email
-profile = ensure_profile(email)
-
-if profile is None:
-    st.error("Impossible de charger le profil.")
+if not st.user.is_logged_in:
+    st.button(
+        "🔵 Continuer avec Google",
+        on_click=lambda: st.login("google")
+    )
     st.stop()
 
-st.session_state.profile = profile
+st.success("✅ Connecté")
+st.write("Email :", st.user.email)
 
-show_dashboard(profile, email)
+if st.button("Déconnexion"):
+    st.logout()
+    st.rerun()
