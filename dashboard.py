@@ -130,17 +130,18 @@ def show_dashboard(profile, email):
         st.write(f"{t['welcome']} {st.user.name} 👋")
         st.caption(f"Connecté : {email}")
 
-    if st.button(t["logout"]):
-    try:
-        supabase.auth.sign_out()
-    except Exception:
-        pass
+    with col2:
+        if st.button(t["logout"]):
+            try:
+                supabase.auth.sign_out()
+            except Exception:
+                pass
 
-    st.session_state.email = None
-    st.session_state.profile = None
-    st.rerun()
+            st.session_state.email = None
+            st.session_state.profile = None
+            st.rerun()
 
-    st.write("---")
+        st.write("---")
 
     # ----------------------------
     # STATS
