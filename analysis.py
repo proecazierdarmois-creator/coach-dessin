@@ -1,12 +1,39 @@
 import json
 import uuid
+import time
+from typing import Any
+
 import streamlit as st
 from google import genai
 from google.genai import types
-from utils import supabase
-import time
 
-def analyze_drawing(image_bytes, mime_type, age=10, niveau="Débutant", level=0):
+from utils import supabase
+
+
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+
+
+# ----------------------------
+# OUTILS
+# ----------------------------
+def parse_note(value: Any) -> int:
+    try:
+        note = int(str(value).split("/")[0].strip())
+        return max(0, min(note, 10))
+    except Exception:
+        return 0
+
+
+# ----------------------------
+# ANALYSE GEMINI
+# ----------------------------
+def analyze_drawing(
+    image_bytes: bytes,
+    mime_type: str,
+    age: int = 10,
+    niveau: str = "Débutant",
+    level: int = 0,
+) -> dict[str, Any] | None:
     prompt = f"""
 Tu es un coach de dessin IA pour enfants.
 
@@ -58,20 +85,60 @@ Profil :
             st.write(data)
             return None
 
+        data["note"] = parse_note(data.get("note"))
+
+        if not isinstance(data.get("points_forts"), list):
+            data["points_forts"] = []
+
+        if not isinstance(data.get("ameliorations"), list):
+            data["ameliorations"] = []
+
+        data.setdefault("defi", "")
+        data.setdefault("message_coach", "")
+
         return data
 
     except Exception as e:
-        st.error("Erreur Gemini")
-        st.code(str(e))
+        error_text = str(e)
+
+        if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
+            st.warning("⏳ Quota Gemini atteint. Réessaie dans environ une minute.")
+        elif "503" in error_text or "UNAVAILABLE" in error_text:
+            st.warning("⏳ Gemini est temporairement surchargé. Réessaie dans quelques instants.")
+        else:
+            st.error("Erreur Gemini")
+            st.code(error_text)
+
         return None
 
 
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+# ----------------------------
+# STORAGE
+# ----------------------------
+def upload_image(email: str, uploaded_file: Any) -> str:
+    file_bytes = uploaded_file.getvalue()
+    file_ext = uploaded_file.name.split(".")[-1].lower()
+    file_name = f"{email}/{uuid.uuid4()}.{file_ext}"
+
+    supabase.storage.from_("drawings").upload(
+        file_name,
+        file_bytes,
+        {"content-type": uploaded_file.type},
+    )
+
+    return supabase.storage.from_("drawings").get_public_url(file_name)
 
 
-def save_analysis(email, image_url, analysis):
+# ----------------------------
+# SAUVEGARDE ANALYSE
+# ----------------------------
+def save_analysis(
+    email: str,
+    image_url: str,
+    analysis: dict[str, Any],
+) -> dict[str, Any] | None:
     try:
-        note = int(str(analysis.get("note", 0)).split("/")[0].strip())
+        note = parse_note(analysis.get("note"))
 
         result = supabase.table("analyses").insert({
             "email": email,
@@ -91,23 +158,16 @@ def save_analysis(email, image_url, analysis):
         st.stop()
 
 
-def upload_image(email, uploaded_file):
-    file_bytes = uploaded_file.getvalue()
-    file_ext = uploaded_file.name.split(".")[-1]
-    file_name = f"{email}/{uuid.uuid4()}.{file_ext}"
-
-    supabase.storage.from_("drawings").upload(
-        file_name,
-        file_bytes,
-        {"content-type": uploaded_file.type}
-    )
-
-    return supabase.storage.from_("drawings").get_public_url(file_name)
-
-
-def update_xp(email, profile, note):
+# ----------------------------
+# XP
+# ----------------------------
+def update_xp(
+    email: str,
+    profile: dict[str, Any],
+    note: int,
+) -> tuple[dict[str, Any], int]:
     xp_gain = note * 5
-    new_xp = profile.get("xp", 0) + xp_gain
+    new_xp = (profile.get("xp", 0) or 0) + xp_gain
 
     result = (
         supabase.table("profiles")
@@ -116,4 +176,6 @@ def update_xp(email, profile, note):
         .execute()
     )
 
-    return result.data[0] if result.data else profile, xp_gain
+    new_profile = result.data[0] if result.data else profile
+
+    return new_profile, xp_gain

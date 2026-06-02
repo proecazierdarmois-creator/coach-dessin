@@ -1,55 +1,59 @@
-from supabase import create_client
-import streamlit as st
 from datetime import date, timedelta
+from typing import Any
+
+import streamlit as st
+from supabase import create_client
+
 
 supabase = create_client(
     st.secrets["SUPABASE_URL"],
-    st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
+    st.secrets["SUPABASE_SERVICE_ROLE_KEY"],
 )
-def get_badges(email, xp, streak):
-    analyses = get_analyses(email)
-    count = len(analyses)
 
-    badges = []
 
-    if count >= 1:
-        badges.append("🎨 Premier dessin")
+# ----------------------------
+# PROFILS
+# ----------------------------
+def get_profile(email: str) -> dict[str, Any] | None:
+    result = supabase.table("profiles").select("*").eq("email", email).execute()
+    return result.data[0] if result.data else None
 
-    if count >= 5:
-        badges.append("🖼️ 5 dessins analysés")
 
-    if count >= 10:
-        badges.append("🏅 10 dessins analysés")
+def ensure_profile(email: str) -> dict[str, Any] | None:
+    if not email or email == "test@example.com":
+        return None
 
-    if xp >= 100:
-        badges.append("⭐ 100 XP")
+    profile = get_profile(email)
+    if profile:
+        return profile
 
-    if xp >= 500:
-        badges.append("🚀 500 XP")
+    result = supabase.table("profiles").insert({
+        "email": email,
+        "xp": 0,
+        "streak": 0,
+    }).execute()
 
-    if streak >= 3:
-        badges.append("🔥 Streak 3 jours")
+    return result.data[0] if result.data else None
 
-    if streak >= 7:
-        badges.append("🔥🔥 Streak 7 jours")
 
-    if any((a.get("note") or 0) >= 8 for a in analyses):
-        badges.append("🌟 Note de 8 ou plus")
-
-    return badges
-
-def get_leaderboard(limit=20):
+# ----------------------------
+# ANALYSES
+# ----------------------------
+def get_analyses(email: str) -> list[dict[str, Any]]:
     result = (
-        supabase.table("profiles")
-        .select("email, xp, streak")
-        .neq("email", "test@example.com")
-        .order("xp", desc=True)
-        .limit(limit)
+        supabase.table("analyses")
+        .select("*")
+        .eq("email", email)
+        .order("created_at", desc=True)
         .execute()
     )
     return result.data or []
 
-def update_streak(email):
+
+# ----------------------------
+# STREAK
+# ----------------------------
+def update_streak(email: str) -> dict[str, Any] | None:
     today = date.today()
 
     profile = get_profile(email)
@@ -82,15 +86,71 @@ def update_streak(email):
 
     return result.data[0] if result.data else profile
 
-def is_admin(email):
+
+# ----------------------------
+# BADGES
+# ----------------------------
+def get_badges(email: str, xp: int, streak: int) -> list[str]:
+    analyses = get_analyses(email)
+    count = len(analyses)
+
+    badges = []
+
+    if count >= 1:
+        badges.append("🎨 Premier dessin")
+
+    if count >= 5:
+        badges.append("🖼️ 5 dessins analysés")
+
+    if count >= 10:
+        badges.append("🏅 10 dessins analysés")
+
+    if xp >= 100:
+        badges.append("⭐ 100 XP")
+
+    if xp >= 500:
+        badges.append("🚀 500 XP")
+
+    if streak >= 3:
+        badges.append("🔥 Streak 3 jours")
+
+    if streak >= 7:
+        badges.append("🔥🔥 Streak 7 jours")
+
+    if any((a.get("note") or 0) >= 8 for a in analyses):
+        badges.append("🌟 Note de 8 ou plus")
+
+    return badges
+
+
+# ----------------------------
+# LEADERBOARD
+# ----------------------------
+def get_leaderboard(limit: int = 20) -> list[dict[str, Any]]:
+    result = (
+        supabase.table("profiles")
+        .select("email, xp, streak")
+        .neq("email", "test@example.com")
+        .order("xp", desc=True)
+        .limit(limit)
+        .execute()
+    )
+
+    return result.data or []
+
+
+# ----------------------------
+# ADMIN
+# ----------------------------
+def is_admin(email: str) -> bool:
     admin_emails = [
         "pro.ecazierdarmois@gmail.com",
-        "eliel2024@outlook.fr"
+        "eliel2024@outlook.fr",
     ]
     return email in admin_emails
 
 
-def get_all_profiles():
+def get_all_profiles() -> list[dict[str, Any]]:
     result = (
         supabase.table("profiles")
         .select("*")
@@ -98,48 +158,20 @@ def get_all_profiles():
         .order("xp", desc=True)
         .execute()
     )
+
     return result.data or []
 
 
-def admin_update_xp(email, new_xp):
+def admin_update_xp(email: str, new_xp: int) -> dict[str, Any] | None:
     result = (
         supabase.table("profiles")
         .update({"xp": new_xp})
         .eq("email", email)
         .execute()
     )
+
     return result.data[0] if result.data else None
 
 
-def admin_delete_analysis(analysis_id):
+def admin_delete_analysis(analysis_id: int) -> None:
     supabase.table("analyses").delete().eq("id", analysis_id).execute()
-
-def get_profile(email):
-    result = supabase.table("profiles").select("*").eq("email", email).execute()
-    return result.data[0] if result.data else None
-
-def ensure_profile(email):
-    # 👉 ignore les faux emails
-    if not email or email == "test@example.com":
-        return None
-
-    profile = get_profile(email)
-    if profile:
-        return profile
-
-    result = supabase.table("profiles").insert({
-        "email": email,
-        "xp": 0,
-    }).execute()
-
-    return result.data[0] if result.data else None
-
-def get_analyses(email):
-    result = (
-        supabase.table("analyses")
-        .select("*")
-        .eq("email", email)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return result.data or []
