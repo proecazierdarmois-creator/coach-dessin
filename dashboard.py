@@ -127,7 +127,7 @@ def show_dashboard(profile, email):
     col1, col2 = st.columns([3, 1])
 
     with col1:
-        st.write(f"{t['welcome']} {st.user.name} 👋")
+        st.write(f"{t['welcome']} 👋")
         st.caption(f"Connecté : {email}")
 
     with col2:
