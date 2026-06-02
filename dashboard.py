@@ -1,7 +1,10 @@
 import streamlit as st
 import time
 
+import supabase
+
 from utils import (
+    supabase,
     get_analyses,
     is_admin,
     get_all_profiles,
@@ -127,10 +130,15 @@ def show_dashboard(profile, email):
         st.write(f"{t['welcome']} {st.user.name} 👋")
         st.caption(f"Connecté : {email}")
 
-    with col2:
-        if st.button(t["logout"]):
-            st.logout()
-            st.rerun()
+    if st.button(t["logout"]):
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass
+
+    st.session_state.email = None
+    st.session_state.profile = None
+    st.rerun()
 
     st.write("---")
 
